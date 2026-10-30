@@ -321,6 +321,10 @@ def build_compare() -> Path:
                 pts.append({**p, "h": p["h"] + offset, "run": run})
             segs.append({**r, "offset": offset})
             offset += r["hours"]
+        # Each run continues from the one before, so the average of the last 3 checks carries straight
+        # across hand-overs (it used to restart, leaving a gap after every hand-over).
+        for i, p in enumerate(pts):
+            p["avg"] = sum(q["rm"] for q in pts[i - 2:i + 1]) / 3 if i >= 2 else None
         series.append({**line, "pts": pts, "segs": segs, "total": offset})
     paired_path = HERE / "runs" / "paired.json"
     paired = json.loads(paired_path.read_text()) if paired_path.exists() else []
@@ -356,10 +360,10 @@ def build_compare() -> Path:
         for p in s["pts"]:
             svg.append(f'<circle cx="{X(p["h"]):.1f}" cy="{Y(p["rm"]):.1f}" r="3" class="dot {s["cls"]}"/>')
         line = [p for p in s["pts"] if p["avg"] is not None]
-        # Break the line between runs: each run's average restarts.
+        # One continuous line per version; the dotted upright lines mark the hand-overs.
         path, prev = [], None
         for p in line:
-            path.append(f'{"M" if prev != p["run"] else "L"}{X(p["h"]):.1f},{Y(p["avg"]):.1f}')
+            path.append(f'{"M" if prev is None else "L"}{X(p["h"]):.1f},{Y(p["avg"]):.1f}')
             prev = p["run"]
         if path:
             svg.append(f'<path d="{" ".join(path)}" class="line {s["cls"]}"/>')
@@ -438,7 +442,7 @@ v1's early checks are less precise (the pilot used 150 deals, and the 1-hour tri
 
 <h2>The fair verdict: paired benchmarks</h2>
 <p class="sub">The chart's checks are quick and noisy. These use the same 1,000 deals (3,000 rounds) for every version, so luck cancels out.
-They're the numbers to decide on. v2 gets its row when its trial ends.</p>
+They're the numbers to decide on. New rows are added every 6 hours or so while a run trains.</p>
 <table><thead><tr><th>Version</th><th>What was measured</th><th>Score vs normal bots</th><th>Deals</th><th>When</th></tr></thead><tbody>{paired_rows}</tbody></table>
 
 <h2>The runs</h2>
