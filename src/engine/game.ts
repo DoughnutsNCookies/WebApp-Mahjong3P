@@ -247,8 +247,11 @@ function turnActions(s: GameState, p: number): Action[] {
       else if (jokers > 0 && use[k] < 4) out.push({ type: 'kong', player: p, kind: k, kongType: 'added', jokers: 1 });
     }
   }
-  // ASSUMPTION: with the wall empty there is no replacement tile, so a joker can't be set aside.
-  if (pl.hand.includes(JOKER) && wallLeft(s) > 0) out.push({ type: 'discardJoker', player: p });
+  // ASSUMPTION: with the wall empty there is no replacement tile, so a joker can't be set aside - unless the
+  // hand is nothing but jokers, when there is no other move: setting one aside then finds the wall empty and
+  // the round ends as a draw (found 2026-10-31: without this a player could be left with no legal move).
+  const onlyJokers = pl.hand.length > 0 && pl.hand.every((t) => t === JOKER);
+  if (pl.hand.includes(JOKER) && (wallLeft(s) > 0 || onlyJokers)) out.push({ type: 'discardJoker', player: p });
   for (const t of new Set(pl.hand)) if (t !== JOKER) out.push({ type: 'discard', player: p, tile: t });
   return out;
 }

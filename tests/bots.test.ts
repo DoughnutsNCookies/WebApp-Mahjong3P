@@ -83,6 +83,38 @@ describe('bots', () => {
     expect(kong.note).toMatch(/uses up your fei/);
   });
 
+  it('with a hand of nothing but fei, every level sets one aside (they used to crash)', () => {
+    const s = newRound(3, 0);
+    s.players[0].hand = parse('J J');
+    s.players[0].melds = [meld('pong', '111d'), meld('pong', '555d'), meld('chow', '789d'), meld('pong', 'EEE')];
+    s.players[0].bonus = parse('A1');
+    s.phase = 'turn';
+    s.turn = 0;
+    s.turnDrew = true;
+    s.discardsMade = 5;
+    for (const level of ['easy', 'normal', 'advanced'] as BotLevel[]) {
+      const a = botAction(s, 0, level);
+      expect(a.type === 'discardJoker' || a.type === 'selfWin').toBe(true);
+    }
+  });
+
+  it('an all-fei hand with the wall empty still has a move, and the round ends as a draw', () => {
+    let s = newRound(3, 0);
+    s.players[0].hand = parse('J J');
+    s.players[0].melds = [meld('pong', '111d'), meld('pong', '555d'), meld('chow', '789d'), meld('pong', 'EEE')];
+    s.players[0].bonus = parse('A1 A2 A3 A4 A5');
+    s.players[0].discardedJokers = 0;
+    s.phase = 'turn';
+    s.turn = 0;
+    s.turnDrew = false; // no self-drawn win possible
+    s.head = s.tail;    // wall empty
+    const legal = legalActions(s, 0);
+    expect(legal).toContainEqual({ type: 'discardJoker', player: 0 });
+    s = applyAction(s, { type: 'discardJoker', player: 0 });
+    expect(s.phase).toBe('ended');
+    expect(s.result!.type).toBe('draw');
+  });
+
   describe('advanced: turning down a win', () => {
     // 2+2+3+3+3 = 13 tiles, waiting on Rd (3 Dragons, 10 fan) or 5d (Small Dragons, 6 fan).
     // East just discarded 5d, so 1 5d and 2 Rd are still unseen.

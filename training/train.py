@@ -116,6 +116,11 @@ class Rollouts:
             self.ready_adv.append(a)
             self.ready_ret.append(a + v)
 
+    def drop_server(self, si: int):
+        """Forget every unfinished round from one server (used when it is restarted)."""
+        for key in [k for k in self.open if k[0] == si]:
+            del self.open[key]
+
     def ready(self) -> int:
         return len(self.ready_rows)
 
@@ -224,21 +229,31 @@ def main(argv=None):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     rng = np.random.default_rng(int(time.time()))
     # Self-play servers, plus a few where the AI sits with real bots (what the benchmark measures).
-    servers = [GameServer(args.envs, ["ai", "ai", "ai"], seed=int(rng.integers(1, 2**31))) for _ in range(args.servers)]
-    servers += [GameServer(args.bot_envs, ["ai", args.bot_level, args.bot_level], seed=int(rng.integers(1, 2**31)))
-                for _ in range(args.bot_servers)]
+    makers = [lambda: GameServer(args.envs, ["ai", "ai", "ai"], seed=int(rng.integers(1, 2**31)))] * args.servers
+    makers += [lambda: GameServer(args.bot_envs, ["ai", args.bot_level, args.bot_level], seed=int(rng.integers(1, 2**31)))] * args.bot_servers
+    servers = [make() for make in makers]
     selfplay = [True] * args.servers + [False] * args.bot_servers
     # One reader thread per server: whichever servers are ready get their moves, so no server (e.g. one
     # with slow bots) holds up the others, and the servers play while the GPU works.
     inbox: queue.Queue = queue.Queue()
+    shutting_down = threading.Event()
 
     def reader(si: int):
-        try:
-            while True:
+        # A server that crashes is reported and replaced, never silently dropped (bot servers once died
+        # one by one on an all-fei hand and nobody noticed). Its unfinished rounds are simply abandoned.
+        while not shutting_down.is_set():
+            try:
                 inbox.put((si, servers[si].read()))
-        except Exception:
-            return
-
+            except Exception as e:
+                if shutting_down.is_set():
+                    return
+                print(f"game server {si} stopped ({e}); restarting it. Details in errors.log.", flush=True)
+                try:
+                    servers[si].close()
+                except Exception:
+                    pass
+                servers[si] = makers[si]()
+                inbox.put((si, None))  # tells the main loop to drop that server's unfinished rounds
     for si in range(len(servers)):
         threading.Thread(target=reader, args=(si,), daemon=True).start()
     first = inbox.get()
@@ -311,6 +326,16 @@ def main(argv=None):
                     except queue.Empty:
                         break
 
+            # A restarted server: forget its unfinished rounds (its game numbers start over).
+            for si, b in items:
+                if b is None:
+                    rollouts.drop_server(si)
+                    for key in [k for k in frozen if k[0] == si]:
+                        del frozen[key]
+            items = [(si, b) for si, b in items if b is not None]
+            if not items:
+                continue
+
             # Round ends: give each player's decisions their reward, and pick who plays the next round.
             for si, b in items:
                 for env, _deal, _seat, r0, r1, r2 in b.done:
@@ -349,7 +374,10 @@ def main(argv=None):
             # Send each server its moves; they play on while this step is stored.
             start = 0
             for si, b in items:
-                servers[si].send(actions[start:start + len(b.obs)])
+                try:
+                    servers[si].send(actions[start:start + len(b.obs)])
+                except OSError:
+                    pass  # it just crashed; its reader thread restarts it
                 start += len(b.obs)
             decisions += len(obs)
             bot_decisions += int(sum(len(b.obs) for si, b in items if not selfplay[si]))
@@ -425,8 +453,12 @@ def main(argv=None):
             log.close()
         bench.close()
         watchdog.close()
+        shutting_down.set()
         for s in servers:
-            s.close()
+            try:
+                s.close()
+            except Exception:
+                pass
         clear_stop()
 
 

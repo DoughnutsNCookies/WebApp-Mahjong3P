@@ -61,7 +61,7 @@ function turnAction(input: AnalyzerInput, legal: Action[], level: BotLevel): Act
   const player = legal[0].player;
   const best = level === 'easy' ? fastest(input) : null;
   const analysis = level !== 'easy' ? analyze(input) : null;
-  const bestShanten = best ? best.shanten : analysis!.options[0].shanten;
+  const bestShanten = best ? best.shanten : (analysis!.options[0]?.shanten ?? 99);
 
   // Kongs: take one when it costs nothing (the replacement draw is free).
   for (const a of legal) {
@@ -79,8 +79,16 @@ function turnAction(input: AnalyzerInput, legal: Action[], level: BotLevel): Act
     return { type: 'discardJoker', player };
   }
 
+  // A hand of nothing but fei has no normal discard: set one aside. (Bots once crashed here, silently
+  // killing the training's bot game servers.)
+  const noDiscard = best ? best.tile < 0 : analysis!.options.length === 0;
+  if (noDiscard) {
+    const aside = legal.find((a) => a.type === 'discardJoker');
+    if (aside) return aside;
+    return legal[0]; // nothing else is possible (e.g. only a win or a kong): take it
+  }
   let tile = best ? best.tile : analysis!.options[0].tile;
-  if (level === 'advanced' && analysis!.options[0].shanten === 0) {
+  if (level === 'advanced' && analysis!.options[0]?.shanten === 0) {
     tile = bestReadyDiscard(input, analysis!)?.tile ?? tile;
   }
   return { type: 'discard', player, tile };
