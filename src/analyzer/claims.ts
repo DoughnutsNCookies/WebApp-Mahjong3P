@@ -60,7 +60,8 @@ export function claimAdvice(input: AnalyzerInput, legal: Action[], tile: Kind): 
     if (a.type === 'claimKong' && a.jokers > 0) {
       out.push({
         action: a, shanten: shanten(after.hand, after.melds.length).best, reaches5: null, recommended: false,
-        note: `Spends ${a.jokers === 1 ? 'a fei' : `${a.jokers} fei`} for no extra fan: a pong scores the same and keeps the wild tile.`,
+        // Kong money (2026-10-31): a fei kong now earns kong money, but the fei is used up for good.
+        note: `Earns kong money (2 units from the discarder) and a free replacement draw, but uses up ${a.jokers === 1 ? 'your fei' : `${a.jokers} of your fei`}: a pong scores the same fan and keeps the wild tile.`,
       });
       continue;
     }

@@ -80,7 +80,7 @@ describe('bots', () => {
     const advice = claimAdvice(inputFromState(s, 1), legalActions(s, 1), s.pending!.tile);
     const kong = advice.find((x) => x.action.type === 'claimKong')!;
     expect(kong.recommended).toBe(false);
-    expect(kong.note).toMatch(/Spends a fei/);
+    expect(kong.note).toMatch(/uses up your fei/);
   });
 
   describe('advanced: turning down a win', () => {

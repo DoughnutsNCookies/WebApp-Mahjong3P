@@ -76,6 +76,12 @@ main { flex: 1; }
 @media (max-width: 759px) { .tile.hand .sub { display: none; } }
 .tile .main { font-weight: 600; }
 .tile.dots .main { color: var(--dots); font-variant-numeric: lining-nums tabular-nums; }
+/* Dot tiles are drawn: blue pips with a pale centre, red ones where tradition has them. */
+.dot-face { width: 78%; height: 66%; display: block; }
+.tile.hand .dot-face { height: 70%; }
+.pip { fill: var(--dots); }
+.pip.red { fill: var(--red); }
+.pip-core { fill: var(--tile); opacity: .55; }
 .tile.red .main { color: var(--red); }
 .tile.green .main { color: var(--green); }
 .tile.white .main { color: #5a6b80; }
