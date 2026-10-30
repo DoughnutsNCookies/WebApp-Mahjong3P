@@ -319,6 +319,15 @@ export function applyAction(state: GameState, action: Action): GameState {
     throw new Error(`Illegal action: ${JSON.stringify(action)} in phase ${state.phase}`);
   }
   const s = structuredClone(state);
+  applyActionInPlace(s, action);
+  return s;
+}
+
+/**
+ * Fast path for simulations and training: changes `s` itself and does not check the action. Only pass
+ * an action taken from legalActions(s, player). The app and tests use applyAction, which checks.
+ */
+export function applyActionInPlace(s: GameState, action: Action): void {
   s.actions.push(action);
   s.events.push({ e: 'action', action });
 
@@ -331,7 +340,6 @@ export function applyAction(state: GameState, action: Action): GameState {
       if (waitingFor(s).length === 0) resolvePending(s);
       break;
   }
-  return s;
 }
 
 /** Draws for player p. Bonus tiles are set aside and replaced; returns false if the wall ran out. */

@@ -35,9 +35,13 @@ export interface PlayerView {
   result: RoundResult | null;
 }
 
-export function playerView(s: GameState, me: number): PlayerView {
+/**
+ * copy: false skips the defensive copy: the view then shares the game state's arrays and must be treated
+ * as read-only and used before the next move (the training server does this for speed).
+ */
+export function playerView(s: GameState, me: number, { copy = true }: { copy?: boolean } = {}): PlayerView {
   const ended = s.phase === 'ended';
-  return structuredClone({
+  const view: PlayerView = {
     me,
     seat: seatOf(s, me),
     dealer: s.dealer,
@@ -60,5 +64,6 @@ export function playerView(s: GameState, me: number): PlayerView {
     winScore: availableWin(s, me),
     revealedHands: ended ? s.players.map((pl) => pl.hand) : null,
     result: s.result,
-  });
+  };
+  return copy ? structuredClone(view) : view;
 }

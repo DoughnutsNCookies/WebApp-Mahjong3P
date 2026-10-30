@@ -47,3 +47,11 @@ cloudpanel.json
 # UI smoke-test screenshots
 /.ui-check/
 
+
+# training: local Python environment, checkpoints and control files
+/training/.venv/
+/training/runs/
+/training/PAUSE
+/training/STOP
+__pycache__/
+

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  Action, applyAction, GameState, isBonus, JOKER, legalActions, makeRng, newRound, parse, playerView, replay,
+  Action, applyAction, applyActionInPlace, GameState, isBonus, JOKER, legalActions, makeRng, newRound, parse, playerView, replay,
   waitingFor, wallLeft,
 } from '../src/engine';
 import { meld } from './helpers';
@@ -343,6 +343,24 @@ function tileTotal(s: GameState): number {
     0,
   );
 }
+
+describe('fast path for training', () => {
+  it('applyActionInPlace plays exactly the same games as applyAction', () => {
+    const rng = makeRng(77);
+    for (let seed = 1; seed <= 100; seed++) {
+      let safe = newRound(seed, seed % 3);
+      const fast = newRound(seed, seed % 3);
+      while (safe.phase !== 'ended') {
+        const p = waitingFor(safe)[0];
+        const legal = legalActions(safe, p);
+        const a = legal[Math.floor(rng() * legal.length)];
+        safe = applyAction(safe, a);
+        applyActionInPlace(fast, a);
+      }
+      expect(JSON.stringify(fast)).toBe(JSON.stringify(safe));
+    }
+  });
+});
 
 describe('random games', () => {
   it('500 rounds of random legal play keep every invariant', () => {
