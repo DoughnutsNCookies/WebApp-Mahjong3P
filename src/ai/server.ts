@@ -8,8 +8,9 @@
 //   { "envs": 64, "seats": ["ai","normal","normal"], "evalDeals": 500, "seed": 7 }   duplicate evaluation
 //
 // Frames (little-endian), each preceded by its length in bytes as a Uint32:
-//   server -> trainer: Int32 nDecisions, Int32 nDone, Int32 OBS, Int32 ACTIONS,
+//   server -> trainer: Int32 nDecisions, Int32 nDone, Int32 OBS, Int32 ACTIONS, Int32 PRIV,
 //                      Int32 [envId, player] x nDecisions, Float32 obs x nDecisions*OBS,
+//                      Float32 privileged x nDecisions*PRIV (hidden info, for the training coach only),
 //                      Uint8 mask x nDecisions*ACTIONS, Float32 [envId, deal, aiSeat, r0, r1, r2] x nDone
 //   trainer -> server: Int32 n, Int32 actionSlot x n   (one per decision, in the order received)
 // A frame with nDecisions = 0 and no running games means evaluation is finished.
@@ -19,7 +20,7 @@ import { botAction, BotLevel } from '../bots';
 import {
   applyActionInPlace, DEFAULT_RULES, GameState, handValue, makeRng, newRound, playerView, PlayerView, waitingFor,
 } from '../engine';
-import { ACTIONS, encodeView, OBS, slotActions } from './encode';
+import { ACTIONS, encodePrivileged, encodeView, OBS, PRIV, slotActions } from './encode';
 
 type Seat = 'ai' | BotLevel;
 interface Config { envs: number; seats: Seat[]; seed: number; evalDeals?: number }
@@ -93,19 +94,24 @@ function advance(env: Env) {
 function sendFrame() {
   const n = pending.length;
   const nDone = done.length / 6;
-  const bytes = 16 + n * 8 + n * OBS * 4 + n * ACTIONS + nDone * 6 * 4;
+  const bytes = 20 + n * 8 + n * OBS * 4 + n * PRIV * 4 + n * ACTIONS + nDone * 6 * 4;
   const buf = Buffer.alloc(4 + bytes);
   buf.writeUInt32LE(bytes, 0);
   buf.writeInt32LE(n, 4);
   buf.writeInt32LE(nDone, 8);
   buf.writeInt32LE(OBS, 12);
   buf.writeInt32LE(ACTIONS, 16);
-  let o = 20;
+  buf.writeInt32LE(PRIV, 20);
+  let o = 24;
   for (const d of pending) { buf.writeInt32LE(d.env.id, o); buf.writeInt32LE(d.player, o + 4); o += 8; }
   const obs = new Float32Array(n * OBS);
   pending.forEach((d, i) => encodeView(d.view, obs, i * OBS));
   Buffer.from(obs.buffer).copy(buf, o);
   o += obs.byteLength;
+  const priv = new Float32Array(n * PRIV);
+  pending.forEach((d, i) => encodePrivileged(d.env.game!, d.player, priv, i * PRIV));
+  Buffer.from(priv.buffer).copy(buf, o);
+  o += priv.byteLength;
   for (const d of pending) { for (let a = 0; a < ACTIONS; a++) buf[o + a] = d.slots[a] ? 1 : 0; o += ACTIONS; }
   const fin = new Float32Array(done);
   Buffer.from(fin.buffer).copy(buf, o);

@@ -17,7 +17,8 @@ REPO = Path(__file__).resolve().parent.parent
 @dataclass
 class Batch:
     env_player: np.ndarray  # (n, 2) int32: env id, player
-    obs: np.ndarray         # (n, OBS) float32
+    obs: np.ndarray         # (n, OBS) float32: the player's own view
+    priv: np.ndarray        # (n, PRIV) float32: hidden info, for the training coach only
     mask: np.ndarray        # (n, ACTIONS) bool
     done: np.ndarray        # (m, 6) float32: env id, deal, ai seat, reward p0, p1, p2
 
@@ -51,17 +52,19 @@ class GameServer:
     def read(self) -> Batch:
         (length,) = struct.unpack("<I", self._read_exact(4))
         frame = self._read_exact(length)
-        n, n_done, obs_size, actions = struct.unpack_from("<iiii", frame, 0)
-        o = 16
+        n, n_done, obs_size, actions, priv_size = struct.unpack_from("<iiiii", frame, 0)
+        o = 20
         # .copy(): frombuffer arrays are read-only, which PyTorch warns about.
         env_player = np.frombuffer(frame, np.int32, n * 2, o).reshape(n, 2).copy()
         o += n * 8
         obs = np.frombuffer(frame, np.float32, n * obs_size, o).reshape(n, obs_size).copy()
         o += n * obs_size * 4
+        priv = np.frombuffer(frame, np.float32, n * priv_size, o).reshape(n, priv_size).copy()
+        o += n * priv_size * 4
         mask = np.frombuffer(frame, np.uint8, n * actions, o).reshape(n, actions).astype(bool)
         o += n * actions
         done = np.frombuffer(frame, np.float32, n_done * 6, o).reshape(n_done, 6).copy()
-        return Batch(env_player, obs, mask, done)
+        return Batch(env_player, obs, priv, mask, done)
 
     def send(self, slots: np.ndarray) -> None:
         slots = np.asarray(slots, dtype=np.int32)

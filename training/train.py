@@ -1,6 +1,9 @@
 """Self-play training with PPO. Three copies of the same AI play each other; the reward is each player's
 money for the round. Every few updates it is benchmarked against the normal bot (evaluate.py).
 
+The coach (value estimate) sees hidden information (opponents' hands, the coming wall) so it can judge
+decisions more fairly than luck allows; the player part chooses moves from its own view only.
+
 Nothing runs without --start:
     py training/train.py                      shows the plan and settings
     py training/train.py --start --run main   trains, resuming training/runs/main if it exists
@@ -54,17 +57,17 @@ class Rollouts:
 
     def __init__(self, lam: float):
         self.lam = lam
-        self.open = defaultdict(list)  # (server, env, player) -> [(obs, mask, action, logp, value)]
+        self.open = defaultdict(list)  # (server, env, player) -> [(obs, priv, mask, action, logp, value)]
         self.samples = defaultdict(list)
 
-    def add(self, key, obs, mask, action, logp, value):
-        self.open[key].append((obs, mask, action, logp, value))
+    def add(self, key, obs, priv, mask, action, logp, value):
+        self.open[key].append((obs, priv, mask, action, logp, value))
 
     def finish(self, key, reward: float):
         steps = self.open.pop(key, [])
         if not steps:
             return
-        values = [s[4] for s in steps]
+        values = [s[5] for s in steps]
         # Reward only at the end of the round (gamma = 1): GAE over the value estimates.
         adv = np.zeros(len(steps), np.float32)
         nxt, gae = reward, 0.0
@@ -73,8 +76,8 @@ class Rollouts:
             gae = delta + self.lam * gae
             adv[t] = gae
             nxt = values[t]
-        for (obs, mask, action, logp, value), a in zip(steps, adv):
-            for k, v in zip(("obs", "mask", "action", "logp", "adv", "ret"), (obs, mask, action, logp, a, a + value)):
+        for (obs, priv, mask, action, logp, value), a in zip(steps, adv):
+            for k, v in zip(("obs", "priv", "mask", "action", "logp", "adv", "ret"), (obs, priv, mask, action, logp, a, a + value)):
                 self.samples[k].append(v)
 
     def ready(self) -> int:
@@ -92,7 +95,9 @@ def ppo_update(model, opt, data, args):
     stats = defaultdict(float)
     for _ in range(args.epochs):
         for idx in torch.randperm(n, device=adv.device).split(args.minibatch):
-            logits, value = model(data["obs"][idx], data["mask"][idx])
+            # The player learns from its own view; the coach (value) also sees the hidden information.
+            logits = model.logits(data["obs"][idx], data["mask"][idx])
+            value = model.value(data["obs"][idx], data["priv"][idx])
             dist = torch.distributions.Categorical(logits=logits)
             logp = dist.log_prob(data["action"][idx])
             ratio = (logp - data["logp"][idx]).exp()
@@ -128,9 +133,9 @@ def main():
     run_dir.mkdir(parents=True, exist_ok=True)
     servers = [GameServer(args.envs, ["ai", "ai", "ai"], seed=1000 + i * 7919 + int(time.time()) % 1000) for i in range(args.servers)]
     batches = [s.read() for s in servers]
-    obs_size, actions = batches[0].obs.shape[1], batches[0].mask.shape[1]
+    obs_size, actions, priv_size = batches[0].obs.shape[1], batches[0].mask.shape[1], batches[0].priv.shape[1]
 
-    model = PolicyValue(obs_size, actions).to(device)
+    model = PolicyValue(obs_size, actions, priv_size).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
     update = 0
     latest = run_dir / "latest.pt"
@@ -143,7 +148,7 @@ def main():
 
     def save(path):
         torch.save({"model": model.state_dict(), "opt": opt.state_dict(), "update": update,
-                    "obs": obs_size, "actions": actions}, path)
+                    "obs": obs_size, "actions": actions, "priv": priv_size}, path)
 
     log_path = run_dir / "log.csv"
     new_log = not log_path.exists()
@@ -167,13 +172,14 @@ def main():
                         rollouts.finish((si, int(env), p), float(r))
                 obs = torch.from_numpy(b.obs).to(device)
                 mask = torch.from_numpy(b.mask).to(device)
-                action, logp, value = model.act(obs, mask)
+                priv = torch.from_numpy(b.priv).to(device)
+                action, logp, value = model.act(obs, mask, priv)
                 action_np = action.cpu().numpy()
                 logp_np, value_np = logp.cpu().numpy(), value.cpu().numpy()
                 forced = b.mask.sum(1) == 1  # nothing to learn from a forced move
                 for i, (env, p) in enumerate(b.env_player):
                     if not forced[i]:
-                        rollouts.add((si, int(env), int(p)), b.obs[i], b.mask[i], action_np[i], logp_np[i], value_np[i])
+                        rollouts.add((si, int(env), int(p)), b.obs[i], b.priv[i], b.mask[i], action_np[i], logp_np[i], value_np[i])
                 srv.send(action_np)
                 decisions += len(action_np)
             batches = [s.read() for s in servers]

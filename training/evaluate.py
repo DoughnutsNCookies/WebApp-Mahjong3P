@@ -59,7 +59,7 @@ def main():
     else:
         ck = torch.load(args.checkpoint, map_location="cpu")
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        model = PolicyValue(ck["obs"], ck["actions"]).to(device)
+        model = PolicyValue(ck["obs"], ck["actions"], ck["priv"]).to(device)
         model.load_state_dict(ck["model"])
         model.eval()
         policy = model_policy(model, device)

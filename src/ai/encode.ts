@@ -9,7 +9,7 @@
 //   25-40 kong of kind k (concealed, or adding to an exposed pong)
 //   41    Joker Opening Slam
 
-import { Action, isBonus, isFlower, JOKER, Kind, Meld, PLAYABLE, PlayerView, loserFan, bonusNumber } from '../engine';
+import { Action, bonusNumber, GameState, isBonus, isFlower, JOKER, Kind, loserFan, Meld, PLAYABLE, PlayerView } from '../engine';
 
 export const ACTIONS = 42;
 
@@ -153,4 +153,34 @@ export function encodeView(v: PlayerView, out: Float32Array, at = 0) {
   put(v.winScore ? v.winScore.fan / 10 : 0);
 
   if (i - at !== OBS) throw new Error(`Observation size mismatch: wrote ${i - at}, expected ${OBS}`);
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Hidden information, for the training coach only (the value estimate). The player part of the network
+// never receives this, so a trained AI plays from its own view alone.
+
+const WALL_AHEAD = 9;  // next normal draws, from the front of the wall
+const REPL_AHEAD = 3;  // next kong/bonus replacements, from the back
+const PER_KIND = KINDS + 2; // playable kinds, fei, any bonus tile
+
+/** Opponents' concealed hands (next player, then previous), and the coming wall tiles. */
+export const PRIV = 2 * (KINDS + 1) + 2 * PER_KIND + 1;
+
+export function encodePrivileged(g: GameState, me: number, out: Float32Array, at = 0) {
+  let i = at;
+  const put = (x: number) => { out[i++] = x; };
+  for (const r of [1, 2]) {
+    const c = new Array(KINDS + 1).fill(0);
+    for (const t of g.players[(me + r) % 3].hand) c[t === JOKER ? KINDS : t]++;
+    c.forEach((x) => put(x / 4));
+  }
+  const kinds = (tiles: Kind[]) => {
+    const c = new Array(PER_KIND).fill(0);
+    for (const t of tiles) c[t === JOKER ? KINDS : isBonus(t) ? KINDS + 1 : t]++;
+    return c;
+  };
+  kinds(g.wall.slice(g.head, Math.min(g.tail, g.head + WALL_AHEAD))).forEach((x) => put(x / WALL_AHEAD));
+  kinds(g.wall.slice(Math.max(g.head, g.tail - REPL_AHEAD), g.tail)).forEach((x) => put(x / REPL_AHEAD));
+  put((g.tail - g.head) / 84);
+  if (i - at !== PRIV) throw new Error(`Privileged size mismatch: wrote ${i - at}, expected ${PRIV}`);
 }

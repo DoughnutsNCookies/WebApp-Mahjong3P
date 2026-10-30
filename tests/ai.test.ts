@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ACTIONS, actionSlot, encodeView, OBS, slotActions } from '../src/ai/encode';
+import { ACTIONS, actionSlot, encodePrivileged, encodeView, OBS, PRIV, slotActions } from '../src/ai/encode';
 import { applyActionInPlace, legalActions, makeRng, newRound, playerView, waitingFor } from '../src/engine';
 
 describe('AI encoding', () => {
@@ -49,9 +49,36 @@ describe('AI encoding', () => {
     expect(Array.from(after)).toEqual(Array.from(before));
   });
 
+  it('the hidden block (coach only) is in range and does reflect hidden tiles', () => {
+    const rng = makeRng(8);
+    const priv = new Float32Array(PRIV);
+    for (let seed = 1; seed <= 60; seed++) {
+      const g = newRound(seed, 0);
+      while (g.phase !== 'ended') {
+        const p = waitingFor(g)[0];
+        encodePrivileged(g, p, priv);
+        let bad = 0;
+        for (const x of priv) if (!(x >= 0 && x <= 1)) bad++;
+        expect(bad).toBe(0);
+        const legal = legalActions(g, p);
+        applyActionInPlace(g, legal[Math.floor(rng() * legal.length)]);
+      }
+    }
+    // Unlike the observation, it changes when an opponent's hidden hand does.
+    const g = newRound(9, 0);
+    const a = new Float32Array(PRIV);
+    const b = new Float32Array(PRIV);
+    encodePrivileged(g, 0, a);
+    const altered = structuredClone(g);
+    altered.players[1].hand = altered.players[2].hand.slice(0, 13);
+    encodePrivileged(altered, 0, b);
+    expect(Array.from(b)).not.toEqual(Array.from(a));
+  });
+
   it('has the documented sizes', () => {
     expect(ACTIONS).toBe(42);
     // Changing the observation makes old trained models unusable: update this on purpose only.
     expect(OBS).toBe(369);
+    expect(PRIV).toBe(71);
   });
 });
