@@ -78,6 +78,7 @@ main { flex: 1; }
 .tile.joker .main, .tile.as-joker .main { color: var(--joker); }
 .tile.bonus .main { color: #7a4b8c; }
 /* Flower/season number in the corner, readable even on small tiles. */
+.tile.card .main { font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
 .tile .num { position: absolute; top: 1px; right: 2px; font-size: 9px; font-weight: 700; color: #7a4b8c; line-height: 1; }
 .tile.hand .num { font-size: 12px; top: 3px; right: 4px; }
 .legend { margin: 12px 0; font-size: 0.92rem; }

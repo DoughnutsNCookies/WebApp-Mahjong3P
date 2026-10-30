@@ -8,7 +8,8 @@ const WIND = ['東', '南', '西', '北'];
 const WIND_LABEL = ['East', 'South', 'West', 'North'];
 const FLOWER = ['梅', '蘭', '菊', '竹'];
 const SEASON = ['春', '夏', '秋', '冬'];
-// The non-numbered bonus tiles in Sean's set. Only the first four are known so far; the rest show a star.
+// The 8 non-numbered bonus tiles in Sean's set: four animals and four joker pictures. The joker pictures are
+// ordinary bonus tiles (1 fan), not the fei wild tiles, which show as 飛.
 const ANIMAL = ['貓', '鼠', '雞', '蜈'];
 const ANIMAL_LABEL = ['Cat', 'Mouse', 'Rooster', 'Centipede'];
 
@@ -25,7 +26,7 @@ export function face(k: Kind): { main: string; sub: string; cls: string; num?: n
     const i = k - 25;
     return i < ANIMAL.length
       ? { main: ANIMAL[i], sub: ANIMAL_LABEL[i], cls: 'bonus animal' }
-      : { main: '★', sub: `Bonus ${i + 1}`, cls: 'bonus animal' };
+      : { main: '🃏', sub: 'Bonus joker', cls: 'bonus card' };
   }
   return { main: '?', sub: '', cls: '' };
 }

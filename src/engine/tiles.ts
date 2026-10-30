@@ -68,9 +68,9 @@ export function name(k: Kind): string {
   if (k === JOKER) return 'Joker';
   if (isFlower(k)) return `Flower ${bonusNumber(k)} (${FLOWER_NAMES[bonusNumber(k) - 1]})`;
   if (isSeason(k)) return `Season ${bonusNumber(k)} (${SEASON_NAMES[bonusNumber(k) - 1]})`;
-  // The set has 8 non-numbered bonus tiles; which picture is which doesn't affect scoring. The first four
-  // are the animals Sean named; the other four are still to be named.
-  return ['Cat', 'Mouse', 'Rooster', 'Centipede'][k - 25] ?? `Bonus ${k - 24}`;
+  // The set has 8 non-numbered bonus tiles: four animals and four joker pictures. The joker pictures are
+  // ordinary 1-fan bonus tiles, not the fei (the wild 'Joker' above). Which is which doesn't affect scoring.
+  return ['Cat', 'Mouse', 'Rooster', 'Centipede'][k - 25] ?? 'Bonus joker';
 }
 
 const TOKEN = /F[1-4]|S[1-4]|A[1-8]|Rd|Gd|Wd|[1-9]+d|[ESWNJ]/y;
