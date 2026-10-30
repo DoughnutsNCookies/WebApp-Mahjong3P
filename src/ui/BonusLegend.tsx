@@ -29,7 +29,7 @@ export function BonusLegend({ seat }: { seat: Seat }) {
       <p className="animals">
         {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => <Tile key={n} kind={animal(n)} />)}
       </p>
-      <p>The cat, mouse, rooster, centipede and the four bonus jokers (🃏) are 1 fan each for everyone. The bonus jokers are not the fei (飛): they cannot stand in for other tiles.</p>
+      <p>The cat, mouse, rooster, centipede, the two boys and the two girls are 1 fan each for everyone.</p>
       <p>A fei (飛) you set aside also sits with your bonus tiles: +1 fan.</p>
     </details>
   );

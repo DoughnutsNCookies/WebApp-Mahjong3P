@@ -8,10 +8,9 @@ const WIND = ['東', '南', '西', '北'];
 const WIND_LABEL = ['East', 'South', 'West', 'North'];
 const FLOWER = ['梅', '蘭', '菊', '竹'];
 const SEASON = ['春', '夏', '秋', '冬'];
-// The 8 non-numbered bonus tiles in Sean's set: four animals and four joker pictures. The joker pictures are
-// ordinary bonus tiles (1 fan), not the fei wild tiles, which show as 飛.
-const ANIMAL = ['貓', '鼠', '雞', '蜈'];
-const ANIMAL_LABEL = ['Cat', 'Mouse', 'Rooster', 'Centipede'];
+// The 8 non-numbered bonus tiles in Sean's set: four animals, two boys and two girls (1 fan each).
+const ANIMAL = ['貓', '鼠', '雞', '蜈', '男', '男', '女', '女'];
+const ANIMAL_LABEL = ['Cat', 'Mouse', 'Rooster', 'Centipede', 'Boy', 'Boy', 'Girl', 'Girl'];
 
 export function face(k: Kind): { main: string; sub: string; cls: string; num?: number } {
   if (isDot(k)) return { main: String(k + 1), sub: 'dot', cls: 'dots' };
@@ -24,9 +23,7 @@ export function face(k: Kind): { main: string; sub: string; cls: string; num?: n
   if (isSeason(k)) return { main: SEASON[bonusNumber(k) - 1], sub: `Season ${bonusNumber(k)}`, cls: 'bonus', num: bonusNumber(k) };
   if (isAnimal(k)) {
     const i = k - 25;
-    return i < ANIMAL.length
-      ? { main: ANIMAL[i], sub: ANIMAL_LABEL[i], cls: 'bonus animal' }
-      : { main: '🃏', sub: 'Bonus joker', cls: 'bonus card' };
+    return { main: ANIMAL[i], sub: ANIMAL_LABEL[i], cls: 'bonus animal' };
   }
   return { main: '?', sub: '', cls: '' };
 }
