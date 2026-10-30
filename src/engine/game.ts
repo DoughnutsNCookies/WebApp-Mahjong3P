@@ -85,7 +85,10 @@ export interface GameState {
   phase: Phase;
   /** Player whose turn it is (during claims: the discarder). */
   turn: number;
-  /** This turn began with a draw, so a self-drawn win is possible. False after claiming a discard. */
+  /**
+   * This turn began with a draw, so a self-drawn win is possible. False after claiming a discard.
+   * ASSUMPTION: you can't pong or chow into a complete hand and declare it; that is a win on the discard.
+   */
   turnDrew: boolean;
   lastDrawn: Kind | null;
   /** Replacement draws so far this turn, for Kong Hu, Flower Hu and the 10-fan chains. */
@@ -450,6 +453,8 @@ function resolvePending(s: GameState) {
   // Claim on a discard.
   const tile = pend.tile;
   const discarder = s.players[pend.from];
+  // ASSUMPTION: a discarded joker that someone wins on moves to the winner, so the discarder loses its
+  // +1 fan and its fei money.
   const takeDiscard = () => {
     if (tile === JOKER) discarder.discardedJokers--;
     else discarder.discards.pop();

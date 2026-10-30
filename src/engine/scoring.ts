@@ -278,6 +278,7 @@ export function loserFan(
   if (discardedJokers) items.push(item('discardedJokers', 'Discarded jokers', discardedJokers));
 
   // Best set of complete scoring pongs inside the concealed hand.
+  // ASSUMPTION: a concealed pong needs at least one real tile; three loose jokers don't count as one.
   const { counts, jokers } = countHand(hand);
   const used = meldUse(melds);
   const scoring = [EAST, SOUTH, WEST, NORTH, RED, RED + 1, WHITE].filter((k) =>
