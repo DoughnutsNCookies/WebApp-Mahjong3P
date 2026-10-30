@@ -75,3 +75,7 @@ for more fan is rarely worth it, which is why the advanced bot seldom does.
 
 House rules come first, then answers to rule questions (marked Q1-Q11 in the code), then the "Dragon Gate"
 app's rules. Anything still assumed is marked `ASSUMPTION` in the code.
+
+Kong money (added 2026-10-31, replacing the handover's "no instant kong payout"): a kong from a discard is
+2 units from the discarder; a self kong or adding to a shown pong is 1 unit from each other player; a
+robbed kong pays nothing (`kongDiscardUnits` / `kongSelfUnits` in `rules.ts`).

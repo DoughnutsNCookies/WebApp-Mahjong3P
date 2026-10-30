@@ -283,8 +283,8 @@ hit.addEventListener('mouseleave', () => {{ tip.style.display = 'none'; cross.se
 # v1 is a chain: each run started from the one before, so their times add up. (The long run actually
 # started from the trial's best point, about 0.4 h in, so v1's later times are slightly generous.)
 LINES = [
-    {"name": "v2", "runs": ["v2trial", "v2"], "cls": "s1",
-     "about": "v2: also sees the analyzer's hand-reading (hints); started from zero"},
+    {"name": "v2", "runs": ["v2trial", "v2", "v2k"], "cls": "s1",
+     "about": "v2: also sees the analyzer's hand-reading (hints); started from zero; v2k = from 02:47 with kong money"},
     {"name": "v1", "runs": ["pilot", "pilot2", "main"], "cls": "s2",
      "about": "v1: raw tiles only; pilot, then the 1-hour trial, then the long run"},
 ]
