@@ -5,8 +5,8 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  // The rules engine and analyzer must stay pure TypeScript so it also runs in Node (bot simulations, a future
-  // multiplayer server, self-play training).
+  // The rules engine and analyzer must stay pure TypeScript so they also run in Node (bot
+  // simulations, a future multiplayer server, self-play training).
   {
     files: ["src/engine/**/*.ts", "src/analyzer/**/*.ts"],
     rules: {
