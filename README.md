@@ -11,7 +11,7 @@ two bots with hints and a post-hand review.
 | 1. Rules engine with tests | Done |
 | 2. Hand analyzer (shanten, live tiles, reachable fan, safety) | Done |
 | 3. Rule-based bots (easy / normal) | Done |
-| 4. Playable game in the browser | Next |
+| 4. Playable game in the browser | Done (hosting on CloudPanel pending) |
 | 5. Self-play training (optional) | |
 
 ## Layout
@@ -33,6 +33,9 @@ two bots with hints and a post-hand review.
   normal uses the analyzer (fan routes, safety, folding, joker advice, claims only into hands that can pay);
   advanced is normal plus money-based play once ready: it can turn down a win under 10 fan when holding
   out is worth more, using win/lose rates fitted to bot games (`scripts/calibrate.ts`).
+- `src/ui/` and `src/app/`: the game. A static Next.js export (
+pm run build` writes `out/`) that runs
+  entirely in the browser; settings, the tally, the round in progress and saved hands live in localStorage.
 - `tests/`: Vitest tests. Each rule and worked example from the house rules has its own test.
 - `scripts/sim.ts`: plays random rounds in Node and counts what happened.
 
@@ -45,6 +48,8 @@ A round is fully determined by its seed, dealer and list of actions, so the acti
 npm test                       # all tests
 npm run typecheck
 npm run lint
+npm run dev                    # play locally at http://localhost:3000
+npm run build && npm run ui-check   # build, then play a round in phone WebKit and desktop Chromium
 npx tsx scripts/sim.ts 2000    # random rounds in Node
 npx tsx scripts/bots.ts 500 normal,easy,easy     # bot vs bot, duplicate format
 npx tsx scripts/calibrate.ts                      # refit the advanced bot's win/lose rates
