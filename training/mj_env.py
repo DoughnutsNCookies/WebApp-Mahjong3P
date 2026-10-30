@@ -30,8 +30,10 @@ class GameServer:
     eval_deals: if set, plays each deal once with the AI in each seat, then stops (duplicate format).
     """
 
-    def __init__(self, envs: int = 64, seats=("ai", "ai", "ai"), seed: int = 1, eval_deals: int | None = None):
-        config = {"envs": envs, "seats": list(seats), "seed": seed}
+    def __init__(self, envs: int = 64, seats=("ai", "ai", "ai"), seed: int = 1, eval_deals: int | None = None,
+                 hints: bool = True):
+        # hints: v2 models also see the analyzer's hand-reading; v1 models (369 numbers) need hints=False.
+        config = {"envs": envs, "seats": list(seats), "seed": seed, "hints": hints}
         if eval_deals:
             config["evalDeals"] = eval_deals
         self.proc = subprocess.Popen(

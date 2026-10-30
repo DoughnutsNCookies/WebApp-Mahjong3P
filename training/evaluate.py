@@ -20,11 +20,14 @@ from model import PolicyValue
 RM_PER_UNIT = 4.00  # one reward unit is a 10-fan hand value at RM0.20/fan (10 x 0.20 x 2)
 
 
-def evaluate(policy, deals: int = 300, bots: str = "normal", envs: int = 64, seed: int = 7) -> dict:
+V1_OBS = 369  # models trained before the hints were added
+
+
+def evaluate(policy, deals: int = 300, bots: str = "normal", envs: int = 64, seed: int = 7, hints: bool = True) -> dict:
     """policy(obs, mask) -> action slots. Returns mean RM per round and a 95% margin."""
     per_deal = np.zeros(deals)
     rounds = 0
-    with GameServer(envs, ["ai", bots, bots], seed=seed, eval_deals=deals) as srv:
+    with GameServer(envs, ["ai", bots, bots], seed=seed, eval_deals=deals, hints=hints) as srv:
         while True:
             b = srv.read()
             for env, deal, ai_seat, r0, r1, r2 in b.done:
@@ -56,6 +59,7 @@ def main():
     ap.add_argument("--seed", type=int, default=7, help="which deals to play (same seed, same deals)")
     args = ap.parse_args()
 
+    ck = None
     if args.random:
         rng = np.random.default_rng(0)
         policy = lambda obs, mask: random_legal(mask, rng)
@@ -67,7 +71,8 @@ def main():
         model.eval()
         policy = model_policy(model, device)
 
-    r = evaluate(policy, args.deals, args.bots, seed=args.seed)
+    hints = args.random or ck["obs"] != V1_OBS
+    r = evaluate(policy, args.deals, args.bots, seed=args.seed, hints=hints)
     print(f"{r['rounds']} rounds vs two {args.bots} bots: {r['rm_per_round']:+.2f} RM/round +/- {r['margin']:.2f}")
     if args.json:
         args.json.write_text(json.dumps(r))

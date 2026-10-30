@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ACTIONS, actionSlot, encodePrivileged, encodeView, OBS, PRIV, slotActions } from '../src/ai/encode';
+import { analyze, inputFromView } from '../src/analyzer';
+import { ACTIONS, actionSlot, encodeHints, encodePrivileged, encodeView, HINTS, OBS, PRIV, slotActions } from '../src/ai/encode';
 import { applyActionInPlace, legalActions, makeRng, newRound, playerView, waitingFor } from '../src/engine';
 
 describe('AI encoding', () => {
@@ -75,10 +76,53 @@ describe('AI encoding', () => {
     expect(Array.from(b)).not.toEqual(Array.from(a));
   });
 
+  it('hints (v2) are in range, match the analyzer, and use only the player view', () => {
+    const rng = makeRng(12);
+    const h = new Float32Array(HINTS);
+    let turns = 0;
+    let claims = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const g = newRound(seed, seed % 3);
+      while (g.phase !== 'ended') {
+        const p = waitingFor(g)[0];
+        const v = playerView(g, p);
+        encodeHints(v, h);
+        let bad = 0;
+        for (const x of h) if (!(x >= 0 && x <= 1)) bad++;
+        expect(bad).toBe(0);
+        if (v.phase === 'turn' && v.turn === p) {
+          // The discards flagged best are exactly those leaving the fewest tiles from ready.
+          const opts = analyze(inputFromView(v)).options;
+          const fewest = Math.min(...opts.map((o) => o.shanten));
+          for (const o of opts) expect(h[8 + o.tile * 3 + 1]).toBe(o.shanten === fewest ? 1 : 0);
+          turns++;
+        } else if (v.phase === 'claim') {
+          expect(h.slice(0, 8 + 48).every((x) => x === 0)).toBe(true);
+          claims++;
+        }
+        const legal = legalActions(g, p);
+        applyActionInPlace(g, legal[Math.floor(rng() * legal.length)]);
+      }
+    }
+    expect(turns).toBeGreaterThan(300);
+    expect(claims).toBeGreaterThan(50);
+    // Built from the view: other players' hidden tiles change nothing.
+    const g = newRound(9, 0);
+    const a = new Float32Array(HINTS);
+    const b = new Float32Array(HINTS);
+    encodeHints(playerView(g, 0), a);
+    const altered = structuredClone(g);
+    altered.players[1].hand = altered.players[2].hand.slice(0, 13);
+    altered.wall.reverse();
+    encodeHints(playerView(altered, 0), b);
+    expect(Array.from(b)).toEqual(Array.from(a));
+  });
+
   it('has the documented sizes', () => {
     expect(ACTIONS).toBe(42);
     // Changing the observation makes old trained models unusable: update this on purpose only.
     expect(OBS).toBe(369);
     expect(PRIV).toBe(71);
+    expect(HINTS).toBe(62);
   });
 });

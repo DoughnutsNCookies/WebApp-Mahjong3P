@@ -19,8 +19,10 @@ import argparse
 import copy
 import csv
 import json
+import queue
 import subprocess
 import sys
+import threading
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -44,10 +46,16 @@ def parse(argv=None):
     ap.add_argument("--init-from", type=Path, help="start from this checkpoint's network (new runs only)")
     ap.add_argument("--servers", type=int, default=16, help="game server processes (CPU cores used for games)")
     ap.add_argument("--envs", type=int, default=192, help="rounds running at once per server")
-    ap.add_argument("--steps", type=int, default=65536, help="decisions collected per update")
-    ap.add_argument("--minibatch", type=int, default=8192)
-    ap.add_argument("--epochs", type=int, default=3)
-    ap.add_argument("--lr", type=float, default=3e-4)
+    ap.add_argument("--bot-servers", type=int, default=4, help="extra servers where the AI plays real bots")
+    ap.add_argument("--bot-envs", type=int, default=192, help="rounds at once per bot server")
+    # Easy bots: the normal bot runs the full analyzer every move and only managed ~300 decisions/s across
+    # 4 servers (0.5% of the data), too little to matter. The normal bot stays the benchmark yardstick.
+    ap.add_argument("--bot-level", default="easy", choices=["easy", "normal", "advanced"])
+    # v2: 4x the decisions per update and smaller steps, to average out luck (v1: 65,536 and 3e-4).
+    ap.add_argument("--steps", type=int, default=262144, help="decisions collected per update")
+    ap.add_argument("--minibatch", type=int, default=16384)
+    ap.add_argument("--epochs", type=int, default=4)
+    ap.add_argument("--lr", type=float, default=1e-4)
     ap.add_argument("--clip", type=float, default=0.2)
     ap.add_argument("--entropy", type=float, default=0.03, help="exploration bonus (the pilot's 0.01 settled too fast)")
     ap.add_argument("--gae-lambda", type=float, default=0.95)
@@ -201,7 +209,7 @@ def main(argv=None):
     args = parse(argv)
     run_dir = HERE / "runs" / args.run
     plan = (f"Self-play PPO, run '{args.run}' in {run_dir}\n"
-            f"  {args.servers} game servers x {args.envs} rounds at once, {args.steps} decisions per update\n"
+            f"  {args.servers} self-play servers x {args.envs} rounds, plus {args.bot_servers} x {args.bot_envs} rounds against {args.bot_level} bots; {args.steps} decisions per update\n"
             f"  older versions in 1-2 seats of {args.league_prob:.0%} of rounds (pool of {args.pool_size}, a snapshot every {args.pool_every} updates)\n"
             f"  benchmark vs two {args.eval_bots} bots every {args.eval_every} updates ({args.eval_deals} deals x 3 seats), in parallel\n"
             f"  latest.pt every {args.save_every} updates, kept snapshot every {args.keep_every}; PAUSE / STOP files in {HERE}\n"
@@ -215,8 +223,26 @@ def main(argv=None):
     torch.set_num_threads(args.torch_threads)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     rng = np.random.default_rng(int(time.time()))
+    # Self-play servers, plus a few where the AI sits with real bots (what the benchmark measures).
     servers = [GameServer(args.envs, ["ai", "ai", "ai"], seed=int(rng.integers(1, 2**31))) for _ in range(args.servers)]
-    batches = [s.read() for s in servers]
+    servers += [GameServer(args.bot_envs, ["ai", args.bot_level, args.bot_level], seed=int(rng.integers(1, 2**31)))
+                for _ in range(args.bot_servers)]
+    selfplay = [True] * args.servers + [False] * args.bot_servers
+    # One reader thread per server: whichever servers are ready get their moves, so no server (e.g. one
+    # with slow bots) holds up the others, and the servers play while the GPU works.
+    inbox: queue.Queue = queue.Queue()
+
+    def reader(si: int):
+        try:
+            while True:
+                inbox.put((si, servers[si].read()))
+        except Exception:
+            return
+
+    for si in range(len(servers)):
+        threading.Thread(target=reader, args=(si,), daemon=True).start()
+    first = inbox.get()
+    batches = [first[1]]
     sizes = {"obs": batches[0].obs.shape[1], "actions": batches[0].mask.shape[1], "priv": batches[0].priv.shape[1]}
 
     model = PolicyValue(sizes["obs"], sizes["actions"], sizes["priv"]).to(device)
@@ -254,7 +280,7 @@ def main(argv=None):
     rollouts = Rollouts(args.gae_lambda)
     watchdog = Watchdog(pause_when_hot=args.pause_when_hot)
     t0 = t_last = time.time()
-    decisions = decisions_total = 0
+    decisions = decisions_total = bot_decisions = 0
     recent: list[float] = []
     best_avg, best_at = -1e9, time.time()
     stop_reason = None
@@ -265,24 +291,44 @@ def main(argv=None):
             if not wait_if_paused(watchdog):
                 break
 
+            # Take every server that has decisions waiting (at least one).
+            items = [first] if first else []
+            first = None
+            if not items:
+                try:
+                    items.append(inbox.get(timeout=5))
+                except queue.Empty:
+                    continue
+            while True:
+                try:
+                    items.append(inbox.get_nowait())
+                except queue.Empty:
+                    if len(items) >= len(servers) // 2:
+                        break
+                    time.sleep(0.002)
+                    try:
+                        items.append(inbox.get_nowait())
+                    except queue.Empty:
+                        break
+
             # Round ends: give each player's decisions their reward, and pick who plays the next round.
-            for si, b in enumerate(batches):
+            for si, b in items:
                 for env, _deal, _seat, r0, r1, r2 in b.done:
                     env = int(env)
                     for p, r in enumerate((r0, r1, r2)):
                         rollouts.finish((si, env, p), float(r))
-                    if pool and rng.random() < args.league_prob:
+                    if selfplay[si] and pool and rng.random() < args.league_prob:
                         seats = set(rng.choice(3, size=int(rng.integers(1, 3)), replace=False).tolist())
                         frozen[(si, env)] = (seats, int(rng.integers(len(pool))))
                     else:
                         frozen.pop((si, env), None)
 
-            # Every server's decisions in one batch through the GPU.
-            sid = np.concatenate([np.full(len(b.obs), i) for i, b in enumerate(batches)])
-            ep = np.concatenate([b.env_player for b in batches])
-            obs = np.concatenate([b.obs for b in batches])
-            mask = np.concatenate([b.mask for b in batches])
-            priv = np.concatenate([b.priv for b in batches])
+            # All ready servers' decisions in one batch through the GPU.
+            sid = np.concatenate([np.full(len(b.obs), si) for si, b in items])
+            ep = np.concatenate([b.env_player for _, b in items])
+            obs = np.concatenate([b.obs for _, b in items])
+            mask = np.concatenate([b.mask for _, b in items])
+            priv = np.concatenate([b.priv for _, b in items])
             who = np.full(len(obs), -1)  # -1: the learner; otherwise the index of an older version in the pool
             for i, (s, (env, p)) in enumerate(zip(sid, ep)):
                 f = frozen.get((int(s), int(env)))
@@ -302,11 +348,11 @@ def main(argv=None):
 
             # Send each server its moves; they play on while this step is stored.
             start = 0
-            for i, srv in enumerate(servers):
-                n = len(batches[i].obs)
-                srv.send(actions[start:start + n])
-                start += n
+            for si, b in items:
+                servers[si].send(actions[start:start + len(b.obs)])
+                start += len(b.obs)
             decisions += len(obs)
+            bot_decisions += int(sum(len(b.obs) for si, b in items if not selfplay[si]))
 
             if not dry:
                 logp_all = np.zeros(len(obs), np.float32)
@@ -316,9 +362,6 @@ def main(argv=None):
                 cid = rollouts.add_chunk(obs=obs, priv=priv, mask=mask, action=actions.astype(np.int64), logp=logp_all)
                 for r in np.flatnonzero(learner & (mask.sum(1) > 1)):  # forced moves teach nothing
                     rollouts.add((int(sid[r]), int(ep[r, 0]), int(ep[r, 1])), cid, int(r), float(value_all[r]))
-
-            batches = [s.read() for s in servers]
-
             if dry or rollouts.ready() < args.steps:
                 continue
             frac = min(1.0, (time.time() - t0) / (args.max_hours * 3600))
@@ -374,7 +417,8 @@ def main(argv=None):
         elapsed = time.time() - t0
         if dry:
             print(f"dry run: {(decisions_total + decisions) / elapsed:,.0f} decisions/s over {elapsed:.0f} s "
-                  f"({args.servers} servers x {args.envs} rounds); GPU {watchdog.last}", flush=True)
+                  f"({args.servers} self-play servers x {args.envs} rounds + {args.bot_servers} bot servers x {args.bot_envs}; "
+                  f"{bot_decisions / elapsed:,.0f}/s from games against bots); GPU {watchdog.last}", flush=True)
         else:
             save(latest)
             print(f"saved {latest} at update {update}", flush=True)

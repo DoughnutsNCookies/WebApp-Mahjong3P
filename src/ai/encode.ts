@@ -9,6 +9,7 @@
 //   25-40 kong of kind k (concealed, or adding to an exposed pong)
 //   41    Joker Opening Slam
 
+import { afterClaim, inputFromView, liveCounts, shanten } from '../analyzer';
 import { Action, bonusNumber, GameState, isBonus, isFlower, JOKER, Kind, loserFan, Meld, PLAYABLE, PlayerView } from '../engine';
 
 export const ACTIONS = 42;
@@ -153,6 +154,59 @@ export function encodeView(v: PlayerView, out: Float32Array, at = 0) {
   put(v.winScore ? v.winScore.fan / 10 : 0);
 
   if (i - at !== OBS) throw new Error(`Observation size mismatch: wrote ${i - at}, expected ${OBS}`);
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Hints (v2): the analyzer's hand-reading, which the v1 AI had to discover from raw tiles and couldn't.
+// Only the cheap parts: tiles from ready (shanten) and live improving tiles, per possible move. About
+// 0.15 ms per decision on your turn. Built from the player's own view only.
+
+const SH_MAX = 6; // shanten values are clamped to -1..6
+
+/** Turn: current shanten (one-hot), then per discard kind: shanten after, is-best flag, live improving tiles.
+ *  Claim: shanten now (13 tiles) and after each claim slot (pong, kong, chow low/mid/high). */
+export const HINTS = (SH_MAX + 2) + KINDS * 3 + 1 + 5;
+
+const shNorm = (s: number) => (Math.min(SH_MAX, s) + 1) / (SH_MAX + 1);
+
+export function encodeHints(v: PlayerView, out: Float32Array, at = 0) {
+  out.fill(0, at, at + HINTS);
+  const meldCount = v.self.melds.length;
+  const input = inputFromView(v);
+  let i = at;
+  if (v.phase === 'turn' && v.turn === v.me && v.hand.length + 3 * meldCount === 14) {
+    const now = shanten(v.hand, meldCount).best;
+    out[i + Math.min(SH_MAX, now) + 1] = 1;
+    i += SH_MAX + 2;
+    const live = liveCounts(input);
+    const after: { k: Kind; sh: number; uk: number }[] = [];
+    for (const k of new Set(v.hand)) {
+      if (k === JOKER) continue;
+      const h = v.hand.slice();
+      h.splice(h.indexOf(k), 1);
+      const sh = shanten(h, meldCount).best;
+      let uk = 0;
+      for (let x = 0; x <= JOKER; x++) if (live[x] && shanten([...h, x], meldCount).best < sh) uk += live[x];
+      after.push({ k, sh, uk });
+    }
+    const best = Math.min(...after.map((a) => a.sh));
+    for (const a of after) {
+      out[i + a.k * 3] = shNorm(a.sh);
+      out[i + a.k * 3 + 1] = a.sh === best ? 1 : 0;
+      out[i + a.k * 3 + 2] = Math.min(1, a.uk / 60);
+    }
+    return;
+  }
+  i += SH_MAX + 2 + KINDS * 3;
+  if ((v.phase === 'claim' || v.phase === 'robKong') && v.claimTile !== null && v.legal.length) {
+    out[i++] = shNorm(shanten(v.hand, meldCount).best);
+    const slots = slotActions(v.legal, v.claimTile);
+    [20, 21, 22, 23, 24].forEach((slot, j) => {
+      const a = slots[slot];
+      const after = a ? afterClaim(input, a, v.claimTile!) : null;
+      if (after) out[i + j] = 1 - shNorm(shanten(after.hand, after.melds.length).best);
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------------------------------

@@ -20,12 +20,14 @@ import { botAction, BotLevel } from '../bots';
 import {
   applyActionInPlace, DEFAULT_RULES, GameState, handValue, makeRng, newRound, playerView, PlayerView, waitingFor,
 } from '../engine';
-import { ACTIONS, encodePrivileged, encodeView, OBS, PRIV, slotActions } from './encode';
+import { ACTIONS, encodeHints, encodePrivileged, encodeView, HINTS, OBS as VIEW, PRIV, slotActions } from './encode';
 
 type Seat = 'ai' | BotLevel;
-interface Config { envs: number; seats: Seat[]; seed: number; evalDeals?: number }
+interface Config { envs: number; seats: Seat[]; seed: number; evalDeals?: number; hints?: boolean }
 
-const cfg: Config = { envs: 64, seats: ['ai', 'ai', 'ai'], seed: 1, ...JSON.parse(process.argv[2] ?? '{}') };
+const cfg: Config = { envs: 64, seats: ['ai', 'ai', 'ai'], seed: 1, hints: true, ...JSON.parse(process.argv[2] ?? '{}') };
+// v2 models also see the analyzer's hints; v1 models (369 numbers) are served with hints: false.
+const OBS = VIEW + (cfg.hints ? HINTS : 0);
 const rng = makeRng(cfg.seed);
 const scale = handValue(10, DEFAULT_RULES);
 
@@ -105,7 +107,10 @@ function sendFrame() {
   let o = 24;
   for (const d of pending) { buf.writeInt32LE(d.env.id, o); buf.writeInt32LE(d.player, o + 4); o += 8; }
   const obs = new Float32Array(n * OBS);
-  pending.forEach((d, i) => encodeView(d.view, obs, i * OBS));
+  pending.forEach((d, i) => {
+    encodeView(d.view, obs, i * OBS);
+    if (cfg.hints) encodeHints(d.view, obs, i * OBS + VIEW);
+  });
   Buffer.from(obs.buffer).copy(buf, o);
   o += obs.byteLength;
   const priv = new Float32Array(n * PRIV);

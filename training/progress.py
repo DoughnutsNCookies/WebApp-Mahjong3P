@@ -76,15 +76,27 @@ def build(run: str) -> Path:
     if stop:
         status, icon, cls = f"Finished: {stop}.", "■", "done"
     elif not alive:
-        status, icon, cls = "Not running (stopped, paused by a restart, or not started). Its last save is kept.", "!", "warn"
-    elif best and best["time"] and now - best["time"] < timedelta(hours=2):
-        status, icon, cls = f"Still improving: new best {hours(now - best['time'])} ago.", "▲", "good"
-    elif best and best["time"]:
-        status, icon, cls = (f"Levelled off: no new best for {hours(now - best['time'])}. "
-                             f"It stops by itself if there's still none by {(best['time'] + timedelta(hours=PATIENCE_H)):%a %H:%M}."), "●", "flat"
+        saved = re.findall(r"saved .* at update (\d+)", (d / "console.log").read_text(errors="replace") if (d / "console.log").exists() else "")
+        status, icon, cls = ((f"Stopped and saved at update {saved[-1]} (by a STOP file or by hand).", "■", "done") if saved else
+                             ("Not running (stopped by a restart, or not started). Its last save is kept.", "!", "warn"))
     else:
-        status, icon, cls = "Warming up: the stop rule needs 3 checks before it starts judging.", "●", "flat"
-
+        # Judge the trend, not the best point: a single high average can just be a lucky streak (this label
+        # once said "still improving" on a run that a paired benchmark showed was flat).
+        until = (f" It stops by itself if there's no new best by {(best['time'] + timedelta(hours=PATIENCE_H)):%a %H:%M}."
+                 if best and best["time"] else "")
+        if len(checks) < 12:
+            status, icon, cls = f"Warming up: the trend needs 12 checks ({len(checks)} so far).{until}", "●", "flat"
+        else:
+            recent = sum(c["rm"] for c in checks[-6:]) / 6
+            before = sum(c["rm"] for c in checks[-12:-6]) / 6
+            diff = recent - before
+            words = f"the last 6 checks average {money(recent)}, against {money(before)} for the 6 before"
+            if diff > 0.15:
+                status, icon, cls = f"Improving: {words}.{until}", "▲", "good"
+            elif diff < -0.15:
+                status, icon, cls = f"Slipping: {words}.{until}", "▼", "warn"
+            else:
+                status, icon, cls = f"Flat: {words} (within the noise).{until}", "●", "flat"
     def explain(x):
         if x is None:
             return "No checks yet."
