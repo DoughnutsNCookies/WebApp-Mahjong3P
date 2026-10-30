@@ -16,9 +16,9 @@ export function ResultPanel({ result, names, report, onReview, onNext }: {
 }) {
   const r = result;
   const headline = r.type === 'draw'
-    ? 'The wall ran out: a draw. Only fei (joker) money is settled.'
+    ? 'The wall ran out: a draw. Only fei (joker) money and kong money are settled.'
     : `${r.winner === 0 ? 'You' : names[r.winner!]} won with ${r.score!.fan} fan${r.payment === 'self' ? ', self-drawn' : ` off ${r.payer === 0 ? 'your' : `${names[r.payer!]}'s`} ${r.score!.items.some((i) => i.key === 'stealKong') ? 'kong' : 'discard'}`}.`;
-  const rows: [string, number[]][] = [['Fan payout', r.fanPayout], ['Fei (jokers)', r.fei], ['Loser settlement', r.loser]];
+  const rows: [string, number[]][] = [['Fan payout', r.fanPayout], ['Fei (jokers)', r.fei], ['Loser settlement', r.loser], ['Kong money', r.kong ?? [0, 0, 0]]];
 
   return (
     <div className="panel result" role="dialog" aria-label="Round result">

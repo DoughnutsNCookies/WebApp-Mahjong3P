@@ -15,6 +15,14 @@ export interface Rules {
   capPayoutMultiplier: number;
   /** ASSUMPTION: Joker Opening Slam (4 jokers in the starting hand) is an instant win, paid as self-drawn. */
   openingSlamInstantWin: boolean;
+  /**
+   * Kong money (Sean's table, 2026-10-31; replaces the handover's "no instant kong payout"). In units of
+   * the stake per fan. A kong from a discard: the discarder pays kongDiscardUnits. A self kong (four in
+   * hand) or adding the 4th tile to a shown pong: each other player pays kongSelfUnits. A robbed kong pays
+   * nothing. ASSUMPTIONS: paid even if the round ends in a draw (it's paid when made); fei kongs pay the same.
+   */
+  kongDiscardUnits: number;
+  kongSelfUnits: number;
 }
 
 export const DEFAULT_RULES: Rules = {
@@ -22,6 +30,8 @@ export const DEFAULT_RULES: Rules = {
   minFan: 5,
   capPayoutMultiplier: 2,
   openingSlamInstantWin: true,
+  kongDiscardUnits: 2,
+  kongSelfUnits: 1,
 };
 
 /** Seats: 0 = East (dealer), 1 = South, 2 = West. There is no North seat. */

@@ -35,7 +35,7 @@ export function roundReport(r: ReportInput): string {
   if (!res) {
     lines.push(`Result: not finished (${r.actions.length} moves so far, wall ${end.tail - end.head}).`);
   } else if (res.type === 'draw') {
-    lines.push('Result: draw, the wall ran out. Only fei money settled.');
+    lines.push('Result: draw, the wall ran out. Only fei and kong money settled.');
   } else {
     const how = res.payment === 'self' ? 'self-drawn' : `off ${res.payer === 0 ? 'your' : names[res.payer!] + "'s"} discard`;
     lines.push(`Result: ${names[res.winner!]} won ${res.score!.fan} fan, ${how}: ` +
@@ -44,7 +44,7 @@ export function roundReport(r: ReportInput): string {
   }
   if (res) {
     const money = (d: number[]) => d.map((x, p) => `${names[p]} ${x >= 0 ? '+' : ''}${rm(x)}`).join(', ');
-    lines.push(`Money: ${money(res.total)} (fan payout: ${money(res.fanPayout)}; fei: ${money(res.fei)}; loser settlement: ${money(res.loser)}).`);
+    lines.push(`Money: ${money(res.total)} (fan payout: ${money(res.fanPayout)}; fei: ${money(res.fei)}; loser settlement: ${money(res.loser)}; kong money: ${money(res.kong ?? [0, 0, 0])}).`);
     if (res.loserFans) lines.push(`Loser settlement fan: ${res.loserFans.map((l, p) => (p === res.winner ? null : `${names[p]} ${l.fan}`)).filter(Boolean).join(', ')}.`);
     lines.push(`Final hands: ${end.players.map((pl, p) => `${names[p]} ${format(pl.hand)}` +
       (pl.melds.length ? ` + ${pl.melds.map((m) => `[${m.slots.map((s) => (s.joker ? 'J' : code(s.kind))).join(' ')}]`).join(' ')}` : '') +

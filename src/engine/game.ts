@@ -65,6 +65,8 @@ export interface RoundResult {
   fanPayout: number[];
   fei: number[];
   loser: number[];
+  /** Kong money paid during the round (house rule, 2026-10-31): see payKong. */
+  kong: number[];
   /** Net money per player for the round, in sen. */
   total: number[];
   nextDealer: number;
@@ -101,6 +103,8 @@ export interface GameState {
   chain: ReplacementReason[];
   lastDrawWasLast: boolean;
   lastDrawer: number;
+  /** Kong money so far this round, per player, in sen. */
+  kongMoney: number[];
   discardsMade: number;
   pending: Pending | null;
   result: RoundResult | null;
@@ -145,7 +149,7 @@ export function newRound(seed: number, dealer = 0, rules: Rules = DEFAULT_RULES)
     head: 0, tail: 84,
     players: [0, 1, 2].map(() => ({ hand: [], melds: [], bonus: [], discardedJokers: 0, discards: [] })),
     phase: 'turn', turn: dealer, turnDrew: true, lastDrawn: null, chain: [], lastDrawWasLast: false,
-    lastDrawer: dealer, discardsMade: 0, pending: null, result: null, actions: [], events: [],
+    lastDrawer: dealer, kongMoney: [0, 0, 0], discardsMade: 0, pending: null, result: null, actions: [], events: [],
   };
   const order = [dealer, next(dealer), next(next(dealer))];
   for (const p of order) for (let i = 0; i < 13; i++) s.players[p].hand.push(s.wall[s.head++]);
@@ -342,6 +346,22 @@ export function applyActionInPlace(s: GameState, action: Action): void {
   }
 }
 
+/** Kong money: `from` is the discarder for a kong from a discard, null for a self or added kong. */
+function payKong(s: GameState, konger: number, from: number | null) {
+  const unit = s.rules.unitSen;
+  if (from !== null) {
+    const amount = s.rules.kongDiscardUnits * unit;
+    s.kongMoney[from] -= amount;
+    s.kongMoney[konger] += amount;
+    return;
+  }
+  for (let p = 0; p < 3; p++) {
+    if (p === konger) continue;
+    s.kongMoney[p] -= s.rules.kongSelfUnits * unit;
+    s.kongMoney[konger] += s.rules.kongSelfUnits * unit;
+  }
+}
+
 /** Draws for player p. Bonus tiles are set aside and replaced; returns false if the wall ran out. */
 function draw(s: GameState, p: number, reason: 'wall' | ReplacementReason): boolean {
   if (wallLeft(s) === 0) {
@@ -426,6 +446,7 @@ function doTurnAction(s: GameState, a: Action) {
       s.pending = { tile: k, from: a.player, options, responses: [null, null, null] };
       return;
     }
+    payKong(s, a.player, null);
     draw(s, a.player, 'kong');
   }
 }
@@ -466,7 +487,10 @@ function resolvePending(s: GameState) {
   if (s.phase === 'robKong') {
     const win = chosen(['win']);
     const konger = s.players[pend.from];
-    if (!win) return void draw(s, pend.from, 'kong');
+    if (!win) {
+      payKong(s, pend.from, null); // nobody robbed it, so the kong stands and pays
+      return void draw(s, pend.from, 'kong');
+    }
     const score = claimWinScore(s, win.player, pend.tile, pend.from, true)!;
     // Undo the kong: the robbed tile goes to the winner.
     const m = konger.melds.pop()!;
@@ -531,7 +555,10 @@ function resolvePending(s: GameState) {
   s.chain = [];
   s.lastDrawn = null;
   // An exposed kong from a discard is not robbable (Q6): the discard itself was open to a win.
-  if (claim.type === 'claimKong') draw(s, p, 'kong');
+  if (claim.type === 'claimKong') {
+    payKong(s, p, pend.from);
+    draw(s, p, 'kong');
+  }
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -552,7 +579,7 @@ function endWin(s: GameState, winner: number, score: Score, payment: PaymentType
   }
   finish(s, {
     type: 'win', winner, payer, payment, score, loserFans, jokers,
-    fanPayout: fan, fei, loser, total: addDeltas(fan, fei, loser), nextDealer: winner,
+    fanPayout: fan, fei, loser, kong: s.kongMoney.slice(), total: addDeltas(fan, fei, loser, s.kongMoney), nextDealer: winner,
   });
 }
 
@@ -561,7 +588,8 @@ function endDraw(s: GameState) {
   const jokers = s.players.map(jokersOwned);
   const fei = feiPayout(jokers, s.rules);
   finish(s, {
-    type: 'draw', jokers, fanPayout: [0, 0, 0], fei, loser: [0, 0, 0], total: fei, nextDealer: s.lastDrawer,
+    type: 'draw', jokers, fanPayout: [0, 0, 0], fei, loser: [0, 0, 0], kong: s.kongMoney.slice(),
+    total: addDeltas(fei, s.kongMoney), nextDealer: s.lastDrawer,
   });
 }
 

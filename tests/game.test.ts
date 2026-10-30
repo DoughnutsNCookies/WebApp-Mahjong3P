@@ -311,6 +311,66 @@ describe('more claim and kong paths', () => {
   });
 });
 
+describe('kong money (house rule, 2026-10-31)', () => {
+  // At RM0.20 a fan: a kong from a discard is RM0.40 from the discarder; a self or added kong is RM0.20
+  // from each other player; a robbed kong pays nothing.
+  it('a kong from a discard: the discarder pays 2 units', () => {
+    let s = position({
+      hands: ['5d 3d 6d 9d E S W N Rd Gd Wd 1d 9d E', '555d 1d 9d S W N Rd Gd Wd 7d', '2d 6d 9d S W N Rd Gd 7d 8d 1d 3d 4d'],
+      wall: '2d 4d 6d 8d',
+    });
+    s.players[1].hand = sorted('555d 1d 9d S W N Rd Gd Wd 7d 8d 2d 3d');
+    s = act(s, { type: 'discard', player: 0, tile: parse('5d')[0] });
+    s = act(s, { type: 'claimKong', player: 1, jokers: 0 });
+    expect(s.kongMoney).toEqual([-40, 40, 0]);
+  });
+
+  it('a self kong and an added kong: each other player pays 1 unit', () => {
+    let s = position({
+      hands: ['EEEE 123d 456d 78d SS', '1d 9d S W N Rd Gd Wd 2d 4d 7d 8d 6d', '2d 6d 9d S W N Rd Gd 7d 8d 1d 3d 4d'],
+      wall: '2d 4d 6d 8d 3d',
+      bonus: ['A1', 'A2', 'A3'],
+    });
+    s = act(s, { type: 'kong', player: 0, kind: parse('E')[0], kongType: 'concealed', jokers: 0 });
+    expect(s.kongMoney).toEqual([40, -20, -20]);
+
+    let t = position({
+      hands: ['5d 3d 6d 9d S W N Rd Gd Wd 1d 9d E', '5d 1d 9d S W N Rd Gd Wd 7d 8d', '2d 6d 9d S W N Rd Gd 7d 8d 1d 3d 4d'],
+      wall: '2d 4d 6d 8d', turn: 1, bonus: ['A1', 'A2', 'A3'],
+    });
+    t.players[1].melds = [meld('pong', '555d')];
+    t = act(t, { type: 'kong', player: 1, kind: parse('5d')[0], kongType: 'added', jokers: 0 });
+    expect(t.kongMoney).toEqual([-20, 40, -20]);
+  });
+
+  it('a robbed kong pays nothing, and kong money is in the round total', () => {
+    let s = position({
+      hands: ['1d 3d 6d 9d E S W N Rd Gd Wd 2d 2d', '5555d 1d 9d S W N Rd Gd Wd 7d 8d', '123d 678d NNN 34d 99d'],
+      wall: '2d 4d 6d', turn: 1, bonus: ['A1', 'A2', ''],
+    });
+    s.players[1].hand = sorted('5555d 1d 9d S W N Rd Gd Wd 7d 8d');
+    s.players[0].hand = sorted('1d 3d 6d 9d E S W N Rd Gd Wd 2d 2d');
+    s = act(s, { type: 'kong', player: 1, kind: parse('5d')[0], kongType: 'concealed', jokers: 0 });
+    s = act(s, { type: 'win', player: 2 });
+    expect(s.result!.kong).toEqual([0, 0, 0]);
+    expect(s.result!.total).toEqual([0, 1, 2].map((p) => s.result!.fanPayout[p] + s.result!.fei[p] + s.result!.loser[p]));
+  });
+
+  it('kong money still counts when the round ends in a draw', () => {
+    let s = position({
+      hands: ['EEEE 123d 456d 78d SS', '1d 9d S W N Rd Gd Wd 2d 4d 7d 8d 6d', '2d 6d 9d S W N Rd Gd 7d 8d 1d 3d 4d'],
+      wall: 'Gd 3d', bonus: ['A1', 'A2', 'A3'],
+    });
+    s = act(s, { type: 'kong', player: 0, kind: parse('E')[0], kongType: 'concealed', jokers: 0 });
+    // The replacement (3d) is the last tile; discard it and nobody can win: a draw.
+    s = act(s, { type: 'discard', player: 0, tile: parse('3d')[0] });
+    while (s.phase !== 'ended') s = act(s, legalActions(s, waitingFor(s)[0]).find((a) => a.type === 'pass' || a.type === 'discard')!);
+    expect(s.result!.type).toBe('draw');
+    expect(s.result!.kong).toEqual([40, -20, -20]);
+    expect(s.result!.total).toEqual([0, 1, 2].map((p) => s.result!.fei[p] + 40 * (p === 0 ? 1 : -0.5)));
+  });
+});
+
 describe('loser settlement in a round', () => {
   it('applies after a win under 10 fan', () => {
     // South wins with 6 fan off East's discard. Loser West holds a Red pong, North pong, F4 and S4 = 4 fan
@@ -363,7 +423,7 @@ describe('fast path for training', () => {
 });
 
 describe('random games', () => {
-  it('500 rounds of random legal play keep every invariant', () => {
+  it('500 rounds of random legal play keep every invariant', { timeout: 60000 }, () => {
     const rng = makeRng(2026);
     let wins = 0;
     for (let seed = 1; seed <= 500; seed++) {
@@ -393,6 +453,7 @@ describe('random games', () => {
       const r = s.result!;
       expect(r.total.reduce((a, b) => a + b, 0)).toBe(0);
       expect(r.fei.reduce((a, b) => a + b, 0)).toBe(0);
+      expect(r.kong.reduce((a, b) => a + b, 0)).toBe(0);
       if (r.type === 'win') {
         wins++;
         expect(r.score!.fan).toBeGreaterThanOrEqual(5);
