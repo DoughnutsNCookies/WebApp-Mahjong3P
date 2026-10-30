@@ -4,7 +4,9 @@
 // Jokers are wild, so each joker fills one missing tile. The 4-copies limit on jokers is ignored here
 // (it matters only in rare hands); the engine's scorer enforces it on actual wins.
 
-import { JOKER, Kind, PLAYABLE } from '../engine';
+// Imported from the module itself, not the engine index: in the hot loops below, going through the index
+// re-exports costs a lookup per use under tsx (it was the biggest cost in the training server's hints).
+import { JOKER, Kind, PLAYABLE } from '../engine/tiles';
 
 export interface Shanten {
   standard: number;
@@ -56,16 +58,32 @@ function dotCombos(c: number[]): Combo[] {
   return pareto;
 }
 
+// Finished answers. The result depends only on the dots pattern, the honour pong and pair counts, the tile
+// total and the sets needed, so that is the key (a plain number: under 2^34).
+const missingMemo = new Map<number, number>();
+
 /** Fewest tiles missing to complete `sets` sets plus a pair, using real tiles only. */
 function minMissing(c: number[], sets: number): number {
-  const real = c.reduce((a, b) => a + b, 0);
   // Honours can't chow, so each kind is simply a set (3+), a pair (2) or a single.
+  let real = 0;
+  let dotKey = 0;
+  for (let i = 0; i < 9; i++) { dotKey = dotKey * 5 + c[i]; real += c[i]; }
   let triples = 0;
   let pairs = 0;
   for (let k = 9; k < PLAYABLE; k++) {
+    real += c[k];
     if (c[k] >= 3) triples++;
     else if (c[k] === 2) pairs++;
   }
+  const key = (((dotKey * 8 + triples) * 8 + pairs) * 32 + real) * 5 + sets;
+  const hit = missingMemo.get(key);
+  if (hit !== undefined) return hit;
+  const result = computeMissing(c, sets, real, triples, pairs);
+  missingMemo.set(key, result);
+  return result;
+}
+
+function computeMissing(c: number[], sets: number, real: number, triples: number, pairs: number): number {
   // Where the pair-slot pair comes from among the honours: none, an honour pair, or a broken honour pong.
   const honourChoices: Combo[] = [[triples, pairs, 0]];
   if (pairs) honourChoices.push([triples, pairs - 1, 1]);
@@ -97,21 +115,31 @@ export function shanten(hand: Kind[], meldCount: number): Shanten {
   const c = new Array(PLAYABLE).fill(0);
   let jokers = 0;
   for (const t of hand) if (t === JOKER) jokers++; else c[t]++;
+  return shantenOfCounts(c, jokers, meldCount);
+}
 
-  const sets = 4 - meldCount;
-  const standard = Math.max(-1, minMissing(c, sets) - jokers - 1);
+const WONDER_KINDS = [9, 10, 11, 12, 13, 14, 15, 0, 8];
 
+/**
+ * The same, from tile counts (16 playable kinds) and a joker count. Doesn't change `c`, so callers trying
+ * many "discard this, draw that" variations can adjust one count, ask, and put it back without copying.
+ */
+export function shantenOfCounts(c: number[], jokers: number, meldCount: number): Shanten {
+  const standard = Math.max(-1, minMissing(c, 4 - meldCount) - jokers - 1);
   let sevenPairs = 99;
   let wonders = 99;
   if (meldCount === 0) {
     // Jokers are set aside and replaced, so the real tiles are what count; a replacement is a free extra try.
     // Four of a kind counts as two pairs here (Q7), so distinct kinds don't matter.
-    const pairs = c.reduce((a, n) => a + Math.floor(n / 2), 0);
+    let pairs = 0;
+    for (let k = 0; k < PLAYABLE; k++) pairs += c[k] >> 1;
     sevenPairs = 6 - Math.min(pairs, 7);
-
-    const wonderKinds = [9, 10, 11, 12, 13, 14, 15, 0, 8];
-    const have = wonderKinds.filter((k) => c[k] > 0).length;
-    const dup = wonderKinds.some((k) => c[k] >= 2) ? 1 : 0;
+    let have = 0;
+    let dup = 0;
+    for (const k of WONDER_KINDS) {
+      if (c[k] > 0) have++;
+      if (c[k] >= 2) dup = 1;
+    }
     wonders = 9 - have + (1 - dup) + (4 - jokers) - 1;
   }
   return { standard, sevenPairs, wonders, best: Math.min(standard, sevenPairs, wonders) };

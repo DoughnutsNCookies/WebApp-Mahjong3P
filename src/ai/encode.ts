@@ -9,8 +9,15 @@
 //   25-40 kong of kind k (concealed, or adding to an exposed pong)
 //   41    Joker Opening Slam
 
-import { afterClaim, inputFromView, liveCounts, shanten } from '../analyzer';
-import { Action, bonusNumber, GameState, isBonus, isFlower, JOKER, Kind, loserFan, Meld, PLAYABLE, PlayerView } from '../engine';
+// Direct module imports (not the index files): faster in the training server's hot path under tsx.
+import { liveCounts } from '../analyzer/analyze';
+import { afterClaim } from '../analyzer/claims';
+import { inputFromView } from '../analyzer/inputs';
+import { shanten, shantenOfCounts } from '../analyzer/shanten';
+import type { Action, GameState } from '../engine/game';
+import { loserFan, Meld } from '../engine/scoring';
+import { bonusNumber, isBonus, isFlower, JOKER, Kind, PLAYABLE } from '../engine/tiles';
+import type { PlayerView } from '../engine/view';
 
 export const ACTIONS = 42;
 
@@ -179,14 +186,25 @@ export function encodeHints(v: PlayerView, out: Float32Array, at = 0) {
     out[i + Math.min(SH_MAX, now) + 1] = 1;
     i += SH_MAX + 2;
     const live = liveCounts(input);
+    // Work on tile counts: take one of kind k out, try each drawable kind, put everything back. No copying
+    // (this used to copy the hand ~250 times per decision and was most of the training's game-server time).
+    const c = new Array(KINDS).fill(0);
+    let fei = 0;
+    for (const t of v.hand) if (t === JOKER) fei++; else c[t]++;
     const after: { k: Kind; sh: number; uk: number }[] = [];
-    for (const k of new Set(v.hand)) {
-      if (k === JOKER) continue;
-      const h = v.hand.slice();
-      h.splice(h.indexOf(k), 1);
-      const sh = shanten(h, meldCount).best;
+    for (let k = 0; k < KINDS; k++) {
+      if (!c[k]) continue;
+      c[k]--;
+      const sh = shantenOfCounts(c, fei, meldCount).best;
       let uk = 0;
-      for (let x = 0; x <= JOKER; x++) if (live[x] && shanten([...h, x], meldCount).best < sh) uk += live[x];
+      for (let x = 0; x < KINDS; x++) {
+        if (!live[x]) continue;
+        c[x]++;
+        if (shantenOfCounts(c, fei, meldCount).best < sh) uk += live[x];
+        c[x]--;
+      }
+      if (live[JOKER] && shantenOfCounts(c, fei + 1, meldCount).best < sh) uk += live[JOKER];
+      c[k]++;
       after.push({ k, sh, uk });
     }
     const best = Math.min(...after.map((a) => a.sh));

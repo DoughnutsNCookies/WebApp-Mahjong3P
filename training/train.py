@@ -66,7 +66,7 @@ def parse(argv=None):
     ap.add_argument("--eval-deals", type=int, default=300)
     ap.add_argument("--eval-bots", default="normal", choices=["easy", "normal", "advanced"])
     ap.add_argument("--save-every", type=int, default=25, help="updates between saves of latest.pt")
-    ap.add_argument("--keep-every", type=int, default=200, help="updates between kept snapshots")
+    ap.add_argument("--keep-every", type=int, default=500, help="updates between kept snapshots (v2: ~50 min apart)")
     ap.add_argument("--torch-threads", type=int, default=4)
     ap.add_argument("--pause-when-hot", action="store_true", help="pause above 82 C (off by default)")
     # Stop rule (agreed with Sean): judged on the average of the last 3 benchmarks.
