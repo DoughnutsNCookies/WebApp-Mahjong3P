@@ -111,14 +111,13 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
 .fan-chip.five { border-color: var(--green); color: var(--green); }
 .fan-pop { display: block; flex-basis: 100%; order: 10; font-size: 0.8rem; color: var(--muted); font-weight: 400; margin-top: 2px; }
 .opp header, .me header { position: relative; }
-.opp-hand { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; margin-bottom: 4px; }
-.opp-hand .side { font-size: 0.75rem; margin-left: auto; }
-.melds, .bonus-row, .river { display: flex; flex-wrap: wrap; gap: 2px; margin: 4px 0; }
+.zone { border-top: 1px solid var(--line); padding: 5px 0 4px; }
+.zone-label { display: block; font-size: 0.7rem; letter-spacing: 0.02em; color: var(--muted); margin-bottom: 3px; }
+.zone-tiles { display: flex; flex-wrap: wrap; gap: 2px; align-items: flex-end; }
+.zone-tiles .none { font-size: 0.8rem; }
 .meld { display: inline-flex; gap: 1px; padding-right: 6px; }
 .meld.concealed .tile { background: #ece6d8; }
-.river { min-height: calc(var(--small-w) * 1.32); }
-.river .muted { font-size: 0.8rem; }
-.hand-row { display: flex; flex-wrap: nowrap; gap: var(--hand-gap); margin-top: 10px; padding-top: 10px; align-items: flex-end; }
+.hand-row { display: flex; flex-wrap: nowrap; gap: var(--hand-gap); padding-top: 8px; align-items: flex-end; }
 .hand-row .drawn { margin-left: calc(var(--hand-w) * 0.35); }
 @media (max-width: 759px) { .me { padding: 8px 6px; } }
 

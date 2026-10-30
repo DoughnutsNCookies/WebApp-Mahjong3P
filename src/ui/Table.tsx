@@ -23,41 +23,50 @@ interface Props {
   hand: ReactNode;
 }
 
+/** A labelled strip of tiles, separated from the one above by a thin line. */
+function Zone({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="zone">
+      <span className="zone-label">{label}</span>
+      <div className="zone-tiles">{children}</div>
+    </div>
+  );
+}
+
 export function MeldRow({ melds }: { melds: Meld[] }) {
   if (!melds.length) return null;
   return (
-    <div className="melds">
+    <Zone label="Sets">
       {melds.map((m, i) => (
         <span key={i} className={`meld${m.concealed ? ' concealed' : ''}`} title={m.concealed ? 'Concealed kong' : m.type}>
           {m.slots.map((s, j) => (
-            <Tile key={j} kind={s.joker ? JOKER : s.kind} joker={s.joker} title={s.joker ? `Joker as ${s.kind}` : undefined} />
+            <Tile key={j} kind={s.joker ? JOKER : s.kind} joker={s.joker} title={s.joker ? `Fei as ${s.kind}` : undefined} />
           ))}
         </span>
       ))}
-    </div>
+    </Zone>
   );
 }
 
 export function BonusRow({ bonus, jokers }: { bonus: Kind[]; jokers: number }) {
   if (!bonus.length && !jokers) return null;
   return (
-    <div className="bonus-row" aria-label="Bonus tiles">
+    <Zone label="Bonus">
       {bonus.map((b, i) => <Tile key={i} kind={b} />)}
-      {[...Array(jokers)].map((_, i) => <Tile key={`j${i}`} kind={JOKER} title="Joker set aside (+1 fan)" />)}
-    </div>
+      {[...Array(jokers)].map((_, i) => <Tile key={`j${i}`} kind={JOKER} title="Fei set aside (+1 fan)" />)}
+    </Zone>
   );
 }
 
 function River({ tiles, highlight }: { tiles: Kind[]; highlight?: number }) {
   return (
-    <div className="river">
-      {tiles.length === 0 ? <span className="muted">No discards</span> : tiles.map((t, i) => (
+    <Zone label="Discards">
+      {tiles.length === 0 ? <span className="muted none">None yet</span> : tiles.map((t, i) => (
         <Tile key={i} kind={t} marked={i === highlight ? 'best' : undefined} />
       ))}
-    </div>
+    </Zone>
   );
 }
-
 export function Table({ view, names, tally, revealed, active, lastDiscard, hand }: Props) {
   const me = view.me;
   // Turn order is East -> South -> West: the player after you sits on your right.
@@ -75,10 +84,9 @@ export function Table({ view, names, tally, revealed, active, lastDiscard, hand 
           <FanChip fan={f.fan} items={f.items} hiddenNote={!revealed} />
           {tally && <span className={`money ${tally[p] < 0 ? 'neg' : ''}`}>{rmShort(tally[p])}</span>}
         </header>
-        <div className="opp-hand">
+        <Zone label={revealed ? 'Hand' : `Hand (${side})`}>
           {revealed ? revealed[p].map((t, i) => <Tile key={i} kind={t} />) : <TileBack count={o.handSize} />}
-          <span className="muted side">{side}</span>
-        </div>
+        </Zone>
         <MeldRow melds={o.melds} />
         <BonusRow bonus={o.bonus} jokers={o.discardedJokers} />
         <River tiles={o.discards} highlight={lastDiscard?.player === p ? lastDiscard.index : undefined} />
@@ -104,7 +112,7 @@ export function Table({ view, names, tally, revealed, active, lastDiscard, hand 
         <River tiles={view.self.discards} highlight={lastDiscard?.player === me ? lastDiscard.index : undefined} />
         <MeldRow melds={view.self.melds} />
         <BonusRow bonus={view.self.bonus} jokers={view.self.discardedJokers} />
-        {hand}
+        <Zone label="Your hand">{hand}</Zone>
       </section>
     </div>
   );
