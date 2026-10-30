@@ -76,12 +76,13 @@ main { flex: 1; }
 @media (max-width: 759px) { .tile.hand .sub { display: none; } }
 .tile .main { font-weight: 600; }
 .tile.dots .main { color: var(--dots); font-variant-numeric: lining-nums tabular-nums; }
-/* Dot tiles are drawn: blue pips with a pale centre, red ones where tradition has them. */
-.dot-face { width: 78%; height: 66%; display: block; }
-.tile.hand .dot-face { height: 70%; }
-.pip { fill: var(--dots); }
-.pip.red { fill: var(--red); }
-.pip-core { fill: var(--tile); opacity: .55; }
+/* Dot tiles are drawn as concentric rings in the traditional green, black and red. */
+.dot-face { width: 80%; height: 70%; display: block; }
+.dot-face .gap { fill: var(--tile); }
+.pip-g .ring { fill: #3f5f2e; }
+.pip-k .ring { fill: #1d1d1b; }
+.pip-r .ring { fill: #b3262c; }
+.dot-face .centre-red { fill: #b3262c; }
 .tile.red .main { color: var(--red); }
 .tile.green .main { color: var(--green); }
 .tile.white .main { color: #5a6b80; }

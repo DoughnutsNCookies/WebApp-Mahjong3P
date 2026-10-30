@@ -29,34 +29,39 @@ export function face(k: Kind): { main: string; sub: string; cls: string; num?: n
   return { main: '?', sub: '', cls: '' };
 }
 
-// Dot positions for 1-9 on a 30 x 40 face, in the traditional patterns. "r" marks a red dot.
-const DOT_LAYOUTS: [number, number, 'b' | 'r'][][] = [
-  [[15, 20, 'r']],
-  [[15, 11, 'b'], [15, 29, 'b']],
-  [[7, 9, 'b'], [15, 20, 'b'], [23, 31, 'b']],
-  [[8, 12, 'b'], [22, 12, 'b'], [8, 28, 'b'], [22, 28, 'b']],
-  [[8, 10, 'b'], [22, 10, 'b'], [15, 20, 'r'], [8, 30, 'b'], [22, 30, 'b']],
-  [[9, 8, 'b'], [21, 8, 'b'], [9, 20, 'b'], [21, 20, 'b'], [9, 32, 'b'], [21, 32, 'b']],
-  [[6, 6, 'b'], [15, 11, 'b'], [24, 16, 'b'], [9, 25, 'b'], [21, 25, 'b'], [9, 34, 'b'], [21, 34, 'b']],
-  [[9, 6, 'b'], [21, 6, 'b'], [9, 15, 'b'], [21, 15, 'b'], [9, 25, 'b'], [21, 25, 'b'], [9, 34, 'b'], [21, 34, 'b']],
-  [[6, 8, 'b'], [15, 8, 'b'], [24, 8, 'b'], [6, 20, 'r'], [15, 20, 'r'], [24, 20, 'r'], [6, 32, 'b'], [15, 32, 'b'], [24, 32, 'b']],
+// Dot positions and colours for 1-9 on a 30 x 40 face, following the traditional tiles Sean shared:
+// g green, k black, r red. Each dot is drawn as concentric rings.
+type Pip = [x: number, y: number, colour: 'g' | 'k' | 'r'];
+const DOT_LAYOUTS: { r: number; pips: Pip[] }[] = [
+  { r: 11, pips: [[15, 20, 'g']] },
+  { r: 5.6, pips: [[15, 11, 'g'], [15, 29, 'k']] },
+  { r: 5, pips: [[8, 8, 'g'], [15, 20, 'r'], [22, 32, 'k']] },
+  { r: 5, pips: [[9, 12, 'g'], [21, 12, 'k'], [9, 28, 'k'], [21, 28, 'g']] },
+  { r: 4.6, pips: [[8, 9, 'g'], [22, 9, 'k'], [15, 20, 'r'], [8, 31, 'k'], [22, 31, 'g']] },
+  { r: 4.4, pips: [[9, 8, 'g'], [21, 8, 'g'], [9, 23, 'r'], [21, 23, 'r'], [9, 33, 'r'], [21, 33, 'r']] },
+  { r: 4, pips: [[6, 6, 'g'], [15, 10, 'g'], [24, 14, 'g'], [9, 25, 'r'], [21, 25, 'r'], [9, 34, 'r'], [21, 34, 'r']] },
+  { r: 4.2, pips: [[9, 6, 'k'], [21, 6, 'k'], [9, 15.5, 'k'], [21, 15.5, 'k'], [9, 25, 'k'], [21, 25, 'k'], [9, 34.5, 'k'], [21, 34.5, 'k']] },
+  { r: 4, pips: [[6, 8, 'k'], [15, 8, 'k'], [24, 8, 'k'], [6, 20, 'r'], [15, 20, 'r'], [24, 20, 'r'], [6, 32, 'g'], [15, 32, 'g'], [24, 32, 'g']] },
 ];
 
 /** The dots of a 1-9 dot tile, as a small drawing. */
 function DotFace({ n }: { n: number }) {
-  const r = n === 1 ? 9 : n <= 4 ? 5.2 : n <= 6 ? 4.6 : 4;
+  const { r, pips } = DOT_LAYOUTS[n - 1];
   return (
     <svg className="dot-face" viewBox="0 0 30 40" aria-hidden="true">
-      {DOT_LAYOUTS[n - 1].map(([x, y, c], i) => (
-        <g key={i}>
-          <circle cx={x} cy={y} r={r} className={c === 'r' ? 'pip red' : 'pip'} />
-          <circle cx={x} cy={y} r={r * 0.45} className="pip-core" />
+      {pips.map(([x, y, c], i) => (
+        <g key={i} className={`pip-${c}`}>
+          <circle cx={x} cy={y} r={r} className="ring" />
+          <circle cx={x} cy={y} r={r * 0.68} className="gap" />
+          <circle cx={x} cy={y} r={r * 0.46} className="ring" />
+          <circle cx={x} cy={y} r={r * 0.2} className="gap" />
+          {/* The 1 dot has a red centre, as on the real tile. */}
+          {n === 1 && <circle cx={x} cy={y} r={r * 0.2} className="centre-red" />}
         </g>
       ))}
     </svg>
   );
 }
-
 /** Plain-text tile name for buttons and notes, e.g. "5 dot", "Red", "Joker". */
 export function label(k: Kind): string {
   const f = face(k);
