@@ -73,9 +73,11 @@ def main():
     obs_t, mask_t, priv_t = (torch.from_numpy(x).to(device) for x in (b.obs, b.mask, b.priv))
     a, logp, value = scratch.act(obs_t, mask_t, priv_t)
     roll = Rollouts(lam=0.95)
+    value_np = value.cpu().numpy()
+    cid = roll.add_chunk(obs=b.obs, priv=b.priv, mask=b.mask, action=a.cpu().numpy().astype(np.int64), logp=logp.cpu().numpy())
     for i, (env, p) in enumerate(b.env_player):
         key = (0, int(env), int(p))
-        roll.add(key, b.obs[i], b.priv[i], b.mask[i], int(a[i]), float(logp[i]), float(value[i]))
+        roll.add(key, cid, i, float(value_np[i]))
         roll.finish(key, float(rng.normal()))
     stats = ppo_update(scratch, torch.optim.Adam(scratch.parameters()), roll.take(device),
                        Namespace(epochs=1, minibatch=32, clip=0.2, entropy=0.01))

@@ -12,7 +12,7 @@ game the app plays.
 | `src/ai/server.ts` | Runs many rounds at once; plays bot seats itself; duplicate-format evaluation mode |
 | `mj_env.py` | Python side of the pipe to the game server |
 | `model.py` | Two separate networks: the player (own view only, illegal moves masked) and the coach (view + hidden block, training only). They share no layers, so nothing hidden reaches the player |
-| `train.py` | Self-play PPO; benchmarks against the normal bot every 25 updates; checkpoints; resumes |
+| `train.py` | Self-play PPO against itself and a pool of its older versions; benchmarks run in a parallel process; checkpoints; resumes; `--dry-run` measures speed without learning |
 | `evaluate.py` | Fair benchmark of a checkpoint against bots, in RM per round with a 95% margin |
 | `safety.py` | GPU temperature watchdog and the PAUSE / STOP files |
 | `smoke.py` | Checks everything works without training anything |
@@ -35,18 +35,31 @@ training\.venv\Scripts\python -m pip install numpy
 training\.venv\Scripts\python training\smoke.py
 ```
 
+## Pilot (2026-10-30, 47 minutes, run `pilot`)
+
+From scratch it went from -1.67 to the normal bot's level in about 25 minutes, then levelled off: final
+benchmark +0.08 +/- 0.18 RM/round vs normal bots (3,000 rounds). Fixed afterwards: one GPU batch for all
+servers and more of them (16 x 192 rounds; dry run 166k decisions/s vs the pilot's 46k), a stronger
+exploration bonus (entropy 0.03; the pilot's 0.01 settled in minutes), older versions of itself in 1-2 seats
+of a quarter of the rounds, benchmarks in a separate process, and saving every 25 updates with a kept
+snapshot every 200 (the pilot wrote 1.9 GB in 47 minutes). The imitation head start was dropped: learning
+from scratch reaches the normal bot in about half an hour.
+
 ## Running (not yet)
 
 ```
 training\.venv\Scripts\python training\train.py                     # shows the plan, trains nothing
-training\.venv\Scripts\python training\train.py --start --run main  # trains; resumes runs\main if it exists
+training\.venv\Scripts\python training\train.py --dry-run 60          # speed check: plays, learns and saves nothing
+training\.venv\Scripts\python training\train.py --start --run main --init-from training\runs\pilot\latest.pt
+                                                                     # trains; resumes runs\main if it exists
 ```
 
 - Pause: create an empty file `training\PAUSE`; delete it to resume. Stop: create `training\STOP` (it saves first).
 - The GPU temperature is written to the log. Pausing when hot is off by default (Sean's choice; the card
   throttles itself); add `--pause-when-hot` to pause at 82 C and resume at 70 C.
 - No power cap by default (Sean's choice). `gpu-power-cap.ps1` is there if wanted.
-- It uses 8 game-server processes and 4 PyTorch threads by default, leaving cores for the CloudPanel VM.
+- It uses 16 game-server processes and 4 PyTorch threads by default (about a third of BEAST's CPU), leaving room
+  for the CloudPanel VM.
 - Progress: `training\runs\<run>\log.csv` (speed, losses, GPU temperature, and RM/round against the normal bot).
 
 ## Measured on BEAST (2026-10-30)
@@ -57,5 +70,4 @@ training\.venv\Scripts\python training\train.py --start --run main  # trains; re
 
 ## Not done yet
 
-- Starting the AI by copying the normal bot first (imitation), which usually saves days of training.
 - Exporting a trained model to run in the browser (ONNX) so the app can offer it as an opponent or hint.

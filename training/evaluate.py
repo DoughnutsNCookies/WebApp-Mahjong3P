@@ -8,6 +8,7 @@ so tile luck and the dealer's edge cancel out. Reports the AI's money per round 
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import numpy as np
@@ -51,6 +52,7 @@ def main():
     ap.add_argument("--random", action="store_true")
     ap.add_argument("--deals", type=int, default=300)
     ap.add_argument("--bots", default="normal", choices=["easy", "normal", "advanced"])
+    ap.add_argument("--json", type=Path, help="also write the result here (used by train.py)")
     args = ap.parse_args()
 
     if args.random:
@@ -66,6 +68,8 @@ def main():
 
     r = evaluate(policy, args.deals, args.bots)
     print(f"{r['rounds']} rounds vs two {args.bots} bots: {r['rm_per_round']:+.2f} RM/round +/- {r['margin']:.2f}")
+    if args.json:
+        args.json.write_text(json.dumps(r))
 
 
 if __name__ == "__main__":

@@ -1,21 +1,26 @@
-"""Self-play training with PPO. Three copies of the same AI play each other; the reward is each player's
-money for the round. Every few updates it is benchmarked against the normal bot (evaluate.py).
+"""Self-play training with PPO. The AI plays copies of itself and, in some rounds, older versions of itself
+(an opponent pool, so it doesn't just get good against its current self). The reward is each player's
+money for the round. A coach (value estimate) that also sees hidden information judges decisions during
+training; the player part chooses moves from its own view only.
 
-The coach (value estimate) sees hidden information (opponents' hands, the coming wall) so it can judge
-decisions more fairly than luck allows; the player part chooses moves from its own view only.
-
-Nothing runs without --start:
-    py training/train.py                      shows the plan and settings
-    py training/train.py --start --run main   trains, resuming training/runs/main if it exists
+Nothing trains without --start:
+    py training/train.py                                   shows the plan and settings
+    py training/train.py --dry-run 60                      measures speed for 60 s; learns and saves nothing
+    py training/train.py --start --run main                trains, resuming runs/main if it exists
+    py training/train.py --start --run main --init-from training/runs/pilot/latest.pt
 
 While it runs: create training/PAUSE to pause (delete it to resume), training/STOP to save and quit.
-The GPU temperature is logged; --pause-when-hot also pauses above 82 C until it is back under 70 C.
+Benchmarks against the bots run in a separate process, so training doesn't wait for them.
 """
 
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
+import json
+import subprocess
+import sys
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -24,7 +29,6 @@ import numpy as np
 import torch
 from torch import nn
 
-from evaluate import evaluate, model_policy
 from mj_env import GameServer
 from model import PolicyValue
 from safety import STOP_FILE, Watchdog, wait_if_paused
@@ -32,62 +36,93 @@ from safety import STOP_FILE, Watchdog, wait_if_paused
 HERE = Path(__file__).resolve().parent
 
 
-def parse():
+def parse(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--start", action="store_true", help="actually train (otherwise just print the plan)")
+    ap.add_argument("--dry-run", type=float, default=0, help="seconds of play with no learning, to measure speed")
     ap.add_argument("--run", default="main")
-    ap.add_argument("--servers", type=int, default=8, help="game server processes (CPU cores used for games)")
-    ap.add_argument("--envs", type=int, default=128, help="rounds running at once per server")
+    ap.add_argument("--init-from", type=Path, help="start from this checkpoint's network (new runs only)")
+    ap.add_argument("--servers", type=int, default=16, help="game server processes (CPU cores used for games)")
+    ap.add_argument("--envs", type=int, default=192, help="rounds running at once per server")
     ap.add_argument("--steps", type=int, default=65536, help="decisions collected per update")
     ap.add_argument("--minibatch", type=int, default=8192)
     ap.add_argument("--epochs", type=int, default=3)
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--clip", type=float, default=0.2)
-    ap.add_argument("--entropy", type=float, default=0.01)
+    ap.add_argument("--entropy", type=float, default=0.03, help="exploration bonus (the pilot's 0.01 settled too fast)")
     ap.add_argument("--gae-lambda", type=float, default=0.95)
-    ap.add_argument("--eval-every", type=int, default=25, help="updates between benchmarks")
+    ap.add_argument("--league-prob", type=float, default=0.25, help="share of rounds with older versions in 1-2 seats")
+    ap.add_argument("--pool-every", type=int, default=50, help="updates between snapshots added to the opponent pool")
+    ap.add_argument("--pool-size", type=int, default=8)
+    ap.add_argument("--eval-every", type=int, default=100, help="updates between benchmarks (run in parallel)")
     ap.add_argument("--eval-deals", type=int, default=300)
-    ap.add_argument("--save-every", type=int, default=10, help="updates between checkpoints")
+    ap.add_argument("--eval-bots", default="normal", choices=["easy", "normal", "advanced"])
+    ap.add_argument("--save-every", type=int, default=25, help="updates between saves of latest.pt")
+    ap.add_argument("--keep-every", type=int, default=200, help="updates between kept snapshots")
     ap.add_argument("--torch-threads", type=int, default=4)
     ap.add_argument("--pause-when-hot", action="store_true", help="pause above 82 C (off by default)")
-    return ap.parse_args()
+    return ap.parse_args(argv)
 
 
 class Rollouts:
-    """Collects each player's decisions in each round and turns finished rounds into training samples."""
+    """Each player's decisions in each round, kept as row numbers into per-step arrays (no copying), turned
+    into training samples when the round ends."""
 
     def __init__(self, lam: float):
         self.lam = lam
-        self.open = defaultdict(list)  # (server, env, player) -> [(obs, priv, mask, action, logp, value)]
-        self.samples = defaultdict(list)
+        self.chunks: dict[int, dict[str, np.ndarray]] = {}
+        self.next_chunk = 0
+        self.open = defaultdict(list)  # (server, env, player) -> [(chunk, row, value)]
+        self.ready_rows: list[tuple[int, int]] = []
+        self.ready_adv: list[float] = []
+        self.ready_ret: list[float] = []
 
-    def add(self, key, obs, priv, mask, action, logp, value):
-        self.open[key].append((obs, priv, mask, action, logp, value))
+    def add_chunk(self, **arrays) -> int:
+        cid = self.next_chunk
+        self.chunks[cid] = arrays
+        self.next_chunk += 1
+        return cid
+
+    def add(self, key, chunk: int, row: int, value: float):
+        self.open[key].append((chunk, row, value))
 
     def finish(self, key, reward: float):
         steps = self.open.pop(key, [])
         if not steps:
             return
-        values = [s[5] for s in steps]
-        # Reward only at the end of the round (gamma = 1): GAE over the value estimates.
-        adv = np.zeros(len(steps), np.float32)
+        # Reward only at the end of the round (gamma = 1): GAE over the coach's value estimates.
         nxt, gae = reward, 0.0
+        adv = [0.0] * len(steps)
         for t in reversed(range(len(steps))):
-            delta = nxt - values[t]
-            gae = delta + self.lam * gae
+            v = steps[t][2]
+            gae = (nxt - v) + self.lam * gae
             adv[t] = gae
-            nxt = values[t]
-        for (obs, priv, mask, action, logp, value), a in zip(steps, adv):
-            for k, v in zip(("obs", "priv", "mask", "action", "logp", "adv", "ret"), (obs, priv, mask, action, logp, a, a + value)):
-                self.samples[k].append(v)
+            nxt = v
+        for (chunk, row, v), a in zip(steps, adv):
+            self.ready_rows.append((chunk, row))
+            self.ready_adv.append(a)
+            self.ready_ret.append(a + v)
 
     def ready(self) -> int:
-        return len(self.samples["action"])
+        return len(self.ready_rows)
 
     def take(self, device):
-        s = {k: torch.as_tensor(np.array(v), device=device) for k, v in self.samples.items()}
-        self.samples = defaultdict(list)
-        return s
+        rows = np.array(self.ready_rows)
+        chunks = np.unique(rows[:, 0])
+        # Gather rows chunk by chunk; reorder advantages and returns the same way.
+        order = np.concatenate([np.flatnonzero(rows[:, 0] == c) for c in chunks])
+        out = {}
+        for k in ("obs", "priv", "mask", "action", "logp"):
+            out[k] = torch.as_tensor(np.concatenate([self.chunks[c][k][rows[rows[:, 0] == c, 1]] for c in chunks]), device=device)
+        out["adv"] = torch.as_tensor(np.array(self.ready_adv, np.float32)[order], device=device)
+        out["ret"] = torch.as_tensor(np.array(self.ready_ret, np.float32)[order], device=device)
+        self.ready_rows, self.ready_adv, self.ready_ret = [], [], []
+        # Drop chunks no unfinished round still points into.
+        live = {c for steps in self.open.values() for c, _, _ in steps}
+        for c in list(self.chunks):
+            if c not in live:
+                del self.chunks[c]
+        return out
 
 
 def ppo_update(model, opt, data, args):
@@ -117,97 +152,196 @@ def ppo_update(model, opt, data, args):
     return {k: v / max(1, args.epochs * ((n + args.minibatch - 1) // args.minibatch)) for k, v in stats.items()}
 
 
-def main():
-    args = parse()
+class Benchmarks:
+    """Runs evaluate.py on a snapshot in its own process, one at a time, and hands back finished results."""
+
+    def __init__(self, run_dir: Path, deals: int, bots: str):
+        self.run_dir, self.deals, self.bots = run_dir, deals, bots
+        self.proc = None
+        self.update = None
+
+    def start(self, model, update: int, sizes: dict) -> bool:
+        if self.proc and self.proc.poll() is None:
+            return False  # the previous benchmark is still running; skip this one
+        path = self.run_dir / "bench.pt"
+        torch.save({"model": model.state_dict(), **sizes}, path)
+        self.update = update
+        self.proc = subprocess.Popen(
+            [sys.executable, str(HERE / "evaluate.py"), "--checkpoint", str(path), "--deals", str(self.deals),
+             "--bots", self.bots, "--json", str(self.run_dir / "bench.json")],
+            cwd=HERE.parent, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        return True
+
+    def poll(self):
+        if not self.proc or self.proc.poll() is None:
+            return None
+        self.proc = None
+        try:
+            return self.update, json.loads((self.run_dir / "bench.json").read_text())
+        except (OSError, ValueError):
+            return None
+
+    def close(self):
+        if self.proc and self.proc.poll() is None:
+            self.proc.terminate()
+
+
+def main(argv=None):
+    args = parse(argv)
     run_dir = HERE / "runs" / args.run
     plan = (f"Self-play PPO, run '{args.run}' in {run_dir}\n"
             f"  {args.servers} game servers x {args.envs} rounds at once, {args.steps} decisions per update\n"
-            f"  benchmark vs two normal bots every {args.eval_every} updates ({args.eval_deals} deals x 3 seats)\n"
-            f"  checkpoint every {args.save_every} updates; PAUSE / STOP files in {HERE}")
-    if not args.start:
-        print(plan + "\n\nNot training: add --start to begin.")
+            f"  older versions in 1-2 seats of {args.league_prob:.0%} of rounds (pool of {args.pool_size}, a snapshot every {args.pool_every} updates)\n"
+            f"  benchmark vs two {args.eval_bots} bots every {args.eval_every} updates ({args.eval_deals} deals x 3 seats), in parallel\n"
+            f"  latest.pt every {args.save_every} updates, kept snapshot every {args.keep_every}; PAUSE / STOP files in {HERE}")
+    if not args.start and not args.dry_run:
+        print(plan + "\n\nNot training: add --start to begin (or --dry-run SECONDS to measure speed).")
         return
-    print(plan)
+    dry = bool(args.dry_run) and not args.start
+    print(("DRY RUN: playing only, nothing is learned or saved\n" if dry else "") + plan, flush=True)
 
     torch.set_num_threads(args.torch_threads)
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    run_dir.mkdir(parents=True, exist_ok=True)
-    servers = [GameServer(args.envs, ["ai", "ai", "ai"], seed=1000 + i * 7919 + int(time.time()) % 1000) for i in range(args.servers)]
+    rng = np.random.default_rng(int(time.time()))
+    servers = [GameServer(args.envs, ["ai", "ai", "ai"], seed=int(rng.integers(1, 2**31))) for _ in range(args.servers)]
     batches = [s.read() for s in servers]
-    obs_size, actions, priv_size = batches[0].obs.shape[1], batches[0].mask.shape[1], batches[0].priv.shape[1]
+    sizes = {"obs": batches[0].obs.shape[1], "actions": batches[0].mask.shape[1], "priv": batches[0].priv.shape[1]}
 
-    model = PolicyValue(obs_size, actions, priv_size).to(device)
+    model = PolicyValue(sizes["obs"], sizes["actions"], sizes["priv"]).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
     update = 0
     latest = run_dir / "latest.pt"
-    if latest.exists():
-        ck = torch.load(latest, map_location=device)
-        model.load_state_dict(ck["model"])
-        opt.load_state_dict(ck["opt"])
-        update = ck["update"]
-        print(f"resumed at update {update}")
+    if not dry:
+        run_dir.mkdir(parents=True, exist_ok=True)
+        if latest.exists():
+            ck = torch.load(latest, map_location=device)
+            model.load_state_dict(ck["model"])
+            opt.load_state_dict(ck["opt"])
+            update = ck["update"]
+            print(f"resumed at update {update}", flush=True)
+        elif args.init_from:
+            model.load_state_dict(torch.load(args.init_from, map_location=device)["model"])
+            print(f"started from {args.init_from}", flush=True)
 
     def save(path):
-        torch.save({"model": model.state_dict(), "opt": opt.state_dict(), "update": update,
-                    "obs": obs_size, "actions": actions, "priv": priv_size}, path)
+        torch.save({"model": model.state_dict(), "opt": opt.state_dict(), "update": update, **sizes}, path)
 
-    log_path = run_dir / "log.csv"
-    new_log = not log_path.exists()
-    log = open(log_path, "a", newline="")
-    writer = csv.writer(log)
-    if new_log:
-        writer.writerow(["time", "update", "decisions_per_s", "policy_loss", "value_loss", "entropy", "gpu_c", "vs_normal_rm", "margin"])
+    log = writer = None
+    if not dry:
+        log_path = run_dir / "log.csv"
+        new_log = not log_path.exists()
+        log = open(log_path, "a", newline="")
+        writer = csv.writer(log)
+        if new_log:
+            writer.writerow(["time", "update", "decisions_per_s", "policy_loss", "value_loss", "entropy",
+                             "gpu_c", "gpu_w", "benchmark_update", "vs_bots_rm", "margin"])
+    bench = Benchmarks(run_dir, args.eval_deals, args.eval_bots)
 
+    pool: list[PolicyValue] = []                          # older versions (only their player part is used)
+    frozen: dict[tuple[int, int], tuple[set, int]] = {}   # (server, env) -> (seats played by the pool, pool index)
     rollouts = Rollouts(args.gae_lambda)
     watchdog = Watchdog(pause_when_hot=args.pause_when_hot)
-    t_last, decisions = time.time(), 0
+    t0 = t_last = time.time()
+    decisions = decisions_total = 0
     try:
         while True:
+            if dry and time.time() - t0 >= args.dry_run:
+                break
             if not wait_if_paused(watchdog):
                 break
-            # Choose moves for every server's pending decisions, send them all, then read the next batches
-            # (the servers play their bot-free moves in parallel while we wait).
-            for si, (srv, b) in enumerate(zip(servers, batches)):
+
+            # Round ends: give each player's decisions their reward, and pick who plays the next round.
+            for si, b in enumerate(batches):
                 for env, _deal, _seat, r0, r1, r2 in b.done:
+                    env = int(env)
                     for p, r in enumerate((r0, r1, r2)):
-                        rollouts.finish((si, int(env), p), float(r))
-                obs = torch.from_numpy(b.obs).to(device)
-                mask = torch.from_numpy(b.mask).to(device)
-                priv = torch.from_numpy(b.priv).to(device)
-                action, logp, value = model.act(obs, mask, priv)
-                action_np = action.cpu().numpy()
-                logp_np, value_np = logp.cpu().numpy(), value.cpu().numpy()
-                forced = b.mask.sum(1) == 1  # nothing to learn from a forced move
-                for i, (env, p) in enumerate(b.env_player):
-                    if not forced[i]:
-                        rollouts.add((si, int(env), int(p)), b.obs[i], b.priv[i], b.mask[i], action_np[i], logp_np[i], value_np[i])
-                srv.send(action_np)
-                decisions += len(action_np)
+                        rollouts.finish((si, env, p), float(r))
+                    if pool and rng.random() < args.league_prob:
+                        seats = set(rng.choice(3, size=int(rng.integers(1, 3)), replace=False).tolist())
+                        frozen[(si, env)] = (seats, int(rng.integers(len(pool))))
+                    else:
+                        frozen.pop((si, env), None)
+
+            # Every server's decisions in one batch through the GPU.
+            sid = np.concatenate([np.full(len(b.obs), i) for i, b in enumerate(batches)])
+            ep = np.concatenate([b.env_player for b in batches])
+            obs = np.concatenate([b.obs for b in batches])
+            mask = np.concatenate([b.mask for b in batches])
+            priv = np.concatenate([b.priv for b in batches])
+            who = np.full(len(obs), -1)  # -1: the learner; otherwise the index of an older version in the pool
+            for i, (s, (env, p)) in enumerate(zip(sid, ep)):
+                f = frozen.get((int(s), int(env)))
+                if f and int(p) in f[0]:
+                    who[i] = f[1]
+            learner = who == -1
+            actions = np.zeros(len(obs), np.int32)
+            obs_t, mask_t = torch.from_numpy(obs).to(device), torch.from_numpy(mask).to(device)
+            li = torch.from_numpy(np.flatnonzero(learner)).to(device)
+            a, logp, value = model.act(obs_t[li], mask_t[li], torch.from_numpy(priv).to(device)[li])
+            actions[learner] = a.cpu().numpy()
+            for k in np.unique(who[~learner]):
+                sel = who == k
+                rows = torch.from_numpy(np.flatnonzero(sel)).to(device)
+                a_k, _, _ = pool[int(k)].act(obs_t[rows], mask_t[rows])
+                actions[sel] = a_k.cpu().numpy()
+
+            # Send each server its moves; they play on while this step is stored.
+            start = 0
+            for i, srv in enumerate(servers):
+                n = len(batches[i].obs)
+                srv.send(actions[start:start + n])
+                start += n
+            decisions += len(obs)
+
+            if not dry:
+                logp_all = np.zeros(len(obs), np.float32)
+                value_all = np.zeros(len(obs), np.float32)
+                logp_all[learner] = logp.cpu().numpy()
+                value_all[learner] = value.cpu().numpy()
+                cid = rollouts.add_chunk(obs=obs, priv=priv, mask=mask, action=actions.astype(np.int64), logp=logp_all)
+                for r in np.flatnonzero(learner & (mask.sum(1) > 1)):  # forced moves teach nothing
+                    rollouts.add((int(sid[r]), int(ep[r, 0]), int(ep[r, 1])), cid, int(r), float(value_all[r]))
+
             batches = [s.read() for s in servers]
 
-            if rollouts.ready() >= args.steps:
-                stats = ppo_update(model, opt, rollouts.take(device), args)
-                update += 1
-                rate = decisions / (time.time() - t_last)
-                t_last, decisions = time.time(), 0
-                bench = ["", ""]
-                if update % args.eval_every == 0:
-                    model.eval()
-                    r = evaluate(model_policy(model, device), args.eval_deals, "normal")
-                    model.train()
-                    bench = [f"{r['rm_per_round']:.3f}", f"{r['margin']:.3f}"]
-                    print(f"update {update}: vs normal bots {r['rm_per_round']:+.2f} RM/round +/- {r['margin']:.2f}")
-                writer.writerow([time.strftime("%Y-%m-%d %H:%M:%S"), update, f"{rate:.0f}", f"{stats['policy']:.4f}",
-                                 f"{stats['value']:.4f}", f"{stats['entropy']:.3f}", watchdog.last.get("temp", ""), *bench])
-                log.flush()
-                if update % args.save_every == 0:
-                    save(run_dir / f"update-{update:05d}.pt")
-                    save(latest)
+            if dry or rollouts.ready() < args.steps:
+                continue
+            stats = ppo_update(model, opt, rollouts.take(device), args)
+            update += 1
+            rate = decisions / (time.time() - t_last)
+            decisions_total += decisions
+            t_last, decisions = time.time(), 0
+
+            if update % args.pool_every == 0:
+                pool = (pool + [copy.deepcopy(model).eval()])[-args.pool_size:]
+            if update % args.eval_every == 0:
+                bench.start(model, update, sizes)
+            bench_cols = ["", "", ""]
+            finished = bench.poll()
+            if finished:
+                bu, r = finished
+                bench_cols = [bu, f"{r['rm_per_round']:.3f}", f"{r['margin']:.3f}"]
+                print(f"update {bu}: vs {args.eval_bots} bots {r['rm_per_round']:+.2f} RM/round +/- {r['margin']:.2f}", flush=True)
+            writer.writerow([time.strftime("%Y-%m-%d %H:%M:%S"), update, f"{rate:.0f}", f"{stats['policy']:.4f}",
+                             f"{stats['value']:.4f}", f"{stats['entropy']:.3f}", watchdog.last.get("temp", ""),
+                             watchdog.last.get("power", ""), *bench_cols])
+            log.flush()
+            if update % args.save_every == 0:
+                save(latest)
+            if update % args.keep_every == 0:
+                save(run_dir / f"update-{update:05d}.pt")
     finally:
-        save(latest)
-        print(f"saved {latest} at update {update}")
+        elapsed = time.time() - t0
+        if dry:
+            print(f"dry run: {(decisions_total + decisions) / elapsed:,.0f} decisions/s over {elapsed:.0f} s "
+                  f"({args.servers} servers x {args.envs} rounds); GPU {watchdog.last}", flush=True)
+        else:
+            save(latest)
+            print(f"saved {latest} at update {update}", flush=True)
+            log.close()
+        bench.close()
         watchdog.close()
-        log.close()
         for s in servers:
             s.close()
         if STOP_FILE.exists():
