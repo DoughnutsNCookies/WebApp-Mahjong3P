@@ -101,6 +101,9 @@ function claimAction(input: AnalyzerInput, legal: Action[], tile: Kind, level: B
     if (!after) continue;
 
     if (a.type === 'claimKong') {
+      // Never spend a fei on a kong: the pong scores the same and keeps the wild tile. (A fei kong once
+      // fed a chain that let an opponent win; see tests/bots.test.ts.)
+      if (a.jokers > 0) continue;
       // A kong draws a replacement instead of discarding: compare the 3n+1 hand directly.
       const sh = shanten(after.hand, after.melds.length).best;
       if (sh <= now) return a;

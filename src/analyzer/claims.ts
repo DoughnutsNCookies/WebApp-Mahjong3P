@@ -57,6 +57,13 @@ export function claimAdvice(input: AnalyzerInput, legal: Action[], tile: Kind): 
     }
     const after = afterClaim(input, a, tile);
     if (!after) continue;
+    if (a.type === 'claimKong' && a.jokers > 0) {
+      out.push({
+        action: a, shanten: shanten(after.hand, after.melds.length).best, reaches5: null, recommended: false,
+        note: `Spends ${a.jokers === 1 ? 'a fei' : `${a.jokers} fei`} for no extra fan: a pong scores the same and keeps the wild tile.`,
+      });
+      continue;
+    }
     if (a.type === 'claimKong') {
       const sh = shanten(after.hand, after.melds.length).best;
       const advice: ClaimAdvice = {

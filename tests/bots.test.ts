@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { AnalyzerInput } from '../src/analyzer';
+import { AnalyzerInput, claimAdvice, inputFromState } from '../src/analyzer';
 import { botAction, BotLevel, decideWin } from '../src/bots';
-import { Action, applyAction, GameState, Meld, newRound, parse, Seat, waitingFor } from '../src/engine';
+import { Action, applyAction, decodeRound, GameState, legalActions, Meld, newRound, parse, replay, Seat, waitingFor } from '../src/engine';
 import { meld } from './helpers';
 
 function playRound(seed: number, levels: BotLevel[], dealer = 0): { s: GameState; actions: Action[] } {
@@ -66,6 +66,21 @@ describe('bots', () => {
     }
     expect(easy).toBe(0);
     expect(normal).toBeGreaterThan(0);
+  });
+
+  it("doesn't spend a fei on a kong when a pong does the same (Sean's hand, 2026-10-30)", () => {
+    // Bot 1 (South) holds E E + a fei when East is discarded. It used to kong with the fei.
+    const r = decodeRound('MJ3P1|seed=1838498445|dealer=1|unit=20|1dW 2- 0p1 0dE');
+    const s = replay(r.seed, r.dealer, r.actions);
+    expect(legalActions(s, 1)).toContainEqual({ type: 'claimKong', player: 1, jokers: 1 });
+    for (const level of ['normal', 'advanced'] as BotLevel[]) {
+      const a = botAction(s, 1, level);
+      expect(a.type === 'claimKong' && a.jokers > 0).toBe(false);
+    }
+    const advice = claimAdvice(inputFromState(s, 1), legalActions(s, 1), s.pending!.tile);
+    const kong = advice.find((x) => x.action.type === 'claimKong')!;
+    expect(kong.recommended).toBe(false);
+    expect(kong.note).toMatch(/Spends a fei/);
   });
 
   describe('advanced: turning down a win', () => {
