@@ -8,17 +8,25 @@ const WIND = ['東', '南', '西', '北'];
 const WIND_LABEL = ['East', 'South', 'West', 'North'];
 const FLOWER = ['梅', '蘭', '菊', '竹'];
 const SEASON = ['春', '夏', '秋', '冬'];
+// The non-numbered bonus tiles in Sean's set. Only the first four are known so far; the rest show a star.
+const ANIMAL = ['貓', '鼠', '雞', '蜈'];
+const ANIMAL_LABEL = ['Cat', 'Mouse', 'Rooster', 'Centipede'];
 
-export function face(k: Kind): { main: string; sub: string; cls: string } {
+export function face(k: Kind): { main: string; sub: string; cls: string; num?: number } {
   if (isDot(k)) return { main: String(k + 1), sub: 'dot', cls: 'dots' };
   if (k >= 9 && k <= 12) return { main: WIND[k - 9], sub: WIND_LABEL[k - 9], cls: 'wind' };
   if (k === 13) return { main: '中', sub: 'Red', cls: 'red' };
   if (k === 14) return { main: '發', sub: 'Green', cls: 'green' };
   if (k === 15) return { main: '白', sub: 'White', cls: 'white' };
   if (k === JOKER) return { main: '飛', sub: 'Joker', cls: 'joker' };
-  if (isFlower(k)) return { main: FLOWER[bonusNumber(k) - 1], sub: `F${bonusNumber(k)}`, cls: 'bonus' };
-  if (isSeason(k)) return { main: SEASON[bonusNumber(k) - 1], sub: `S${bonusNumber(k)}`, cls: 'bonus' };
-  if (isAnimal(k)) return { main: '★', sub: `B${k - 24}`, cls: 'bonus' };
+  if (isFlower(k)) return { main: FLOWER[bonusNumber(k) - 1], sub: `Flower ${bonusNumber(k)}`, cls: 'bonus', num: bonusNumber(k) };
+  if (isSeason(k)) return { main: SEASON[bonusNumber(k) - 1], sub: `Season ${bonusNumber(k)}`, cls: 'bonus', num: bonusNumber(k) };
+  if (isAnimal(k)) {
+    const i = k - 25;
+    return i < ANIMAL.length
+      ? { main: ANIMAL[i], sub: ANIMAL_LABEL[i], cls: 'bonus animal' }
+      : { main: '★', sub: `Bonus ${i + 1}`, cls: 'bonus animal' };
+  }
   return { main: '?', sub: '', cls: '' };
 }
 
@@ -47,6 +55,7 @@ export function Tile({ kind, size = 'small', selected, marked, joker, dim, onCli
     .filter(Boolean).join(' ');
   const content = (
     <>
+      {f.num !== undefined && <span className="num" aria-hidden="true">{f.num}</span>}
       <span className="main">{f.main}</span>
       <span className="sub">{joker ? 'joker' : f.sub}</span>
     </>

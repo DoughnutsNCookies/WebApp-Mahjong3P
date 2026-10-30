@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import { analyze, claimAdvice, inputFromView } from '../analyzer';
 import { Action, GameState, JOKER, Kind, playerView, waitingFor } from '../engine';
 import { actionLabel } from './format';
+import { BonusLegend } from './BonusLegend';
 import { ClaimHint, HintPanel } from './Hint';
 import { ResultPanel } from './Result';
 import { Table } from './Table';
@@ -172,6 +173,8 @@ export function Game({ game, names, tally, onAct, onNext, onReview }: {
         )}
         {analysis && <HintPanel analysis={analysis} names={names} />}
         {advice && <ClaimHint advice={advice} claimTile={view.claimTile} />}
+
+        <BonusLegend seat={view.seat} />
 
         {view.phase === 'ended' && game.result && (
           <ResultPanel result={game.result} names={names} onReview={onReview} onNext={onNext} />
