@@ -25,7 +25,13 @@ export interface PlayerState {
 export type Phase = 'opening' | 'turn' | 'claim' | 'robKong' | 'ended';
 
 export type Action =
+  /** A normal discard. Jokers can't be discarded this way: see 'discardJoker'. */
   | { type: 'discard'; player: number; tile: Kind }
+  /**
+   * Set a joker aside in your bonus area (+1 fan, never claimable) and draw a replacement, like a bonus
+   * tile. Not a discard: it doesn't end your turn or count for Earthly Slam.
+   */
+  | { type: 'discardJoker'; player: number }
   | { type: 'selfWin'; player: number }
   /** Concealed kong (4 in hand, `jokers` of them jokers) or added kong (4th tile onto an exposed pong). */
   | { type: 'kong'; player: number; kind: Kind; kongType: 'concealed' | 'added'; jokers: number }
@@ -237,7 +243,9 @@ function turnActions(s: GameState, p: number): Action[] {
       else if (jokers > 0 && use[k] < 4) out.push({ type: 'kong', player: p, kind: k, kongType: 'added', jokers: 1 });
     }
   }
-  for (const t of new Set(pl.hand)) out.push({ type: 'discard', player: p, tile: t });
+  // ASSUMPTION: with the wall empty there is no replacement tile, so a joker can't be set aside.
+  if (pl.hand.includes(JOKER) && wallLeft(s) > 0) out.push({ type: 'discardJoker', player: p });
+  for (const t of new Set(pl.hand)) if (t !== JOKER) out.push({ type: 'discard', player: p, tile: t });
   return out;
 }
 
@@ -245,8 +253,8 @@ function turnActions(s: GameState, p: number): Action[] {
 function claimOptions(s: GameState, p: number, tile: Kind, from: number): Action[] {
   const out: Action[] = [];
   if (claimWinScore(s, p, tile, from, false)) out.push({ type: 'win', player: p });
-  // Q2: a discarded joker can only be won on. After the last wall tile, only a win can be claimed.
-  if (tile === JOKER || wallLeft(s) === 0) return out;
+  // After the last wall tile, only a win can be claimed.
+  if (wallLeft(s) === 0) return out;
 
   const pl = s.players[p];
   const real = count(pl.hand, tile);
@@ -362,10 +370,18 @@ function doTurnAction(s: GameState, a: Action) {
 
   if (a.type === 'discard') {
     removeTiles(pl.hand, a.tile, 1);
-    if (a.tile === JOKER) pl.discardedJokers++;
-    else pl.discards.push(a.tile);
+    pl.discards.push(a.tile);
     s.discardsMade++;
     return openClaims(s, a.player, a.tile);
+  }
+
+  if (a.type === 'discardJoker') {
+    // Q2 (corrected): the joker goes to the bonus area and is replaced like a bonus tile.
+    // ASSUMPTION: winning on that replacement is Flower Hu, as for any bonus tile replacement.
+    removeTiles(pl.hand, JOKER, 1);
+    pl.discardedJokers++;
+    draw(s, a.player, 'bonus');
+    return;
   }
 
   if (a.type === 'kong') {
@@ -453,12 +469,7 @@ function resolvePending(s: GameState) {
   // Claim on a discard.
   const tile = pend.tile;
   const discarder = s.players[pend.from];
-  // ASSUMPTION: a discarded joker that someone wins on moves to the winner, so the discarder loses its
-  // +1 fan and its fei money.
-  const takeDiscard = () => {
-    if (tile === JOKER) discarder.discardedJokers--;
-    else discarder.discards.pop();
-  };
+  const takeDiscard = () => discarder.discards.pop();
 
   const win = chosen(['win']);
   if (win) {

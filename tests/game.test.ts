@@ -108,21 +108,58 @@ describe('claims (section 3)', () => {
 });
 
 describe('jokers in play (section 5)', () => {
-  it('a discarded joker cannot be ponged, but can be won on (Q2)', () => {
-    let s = position({
-      hands: ['J 3d 6d 9d E S W N Rd Gd Wd 1d 9d E', '123d 456d 789d EEE 5d', 'J J 2d 6d 9d S W N Rd Gd 7d 8d 1d'],
-      wall: '2d 4d',
-      bonus: ['A1', '', 'A2'],
-    });
-    s = act(s, { type: 'discard', player: 0, tile: JOKER });
+  // Hand where South would win on any tile, to prove nobody can claim a joker.
+  const jokerPosition = () => position({
+    hands: ['J 3d 6d 9d E S W N Rd Gd Wd 1d 9d E', '123d 456d 789d EEE J', 'J J 2d 6d 9d S W N Rd Gd 7d 8d 1d'],
+    wall: '2d 4d 7d',
+    bonus: ['A1', '', 'A2'],
+  });
+
+  it('a joker is set aside like a bonus tile and replaced from the back of the wall (Q2)', () => {
+    let s = jokerPosition();
+    // Jokers never appear as normal discards.
+    expect(legalActions(s, 0).some((a) => a.type === 'discard' && a.tile === JOKER)).toBe(false);
+    s = act(s, { type: 'discardJoker', player: 0 });
     expect(s.players[0].discardedJokers).toBe(1);
-    expect(legalActions(s, 2)).toEqual([]);
-    expect(has(s, 1, 'win')).toBe(true);
+    expect(s.players[0].hand).not.toContain(JOKER);
+    expect(s.players[0].hand).toContain(parse('7d')[0]); // the replacement
+    expect(s.players[0].hand.length).toBe(14);
+    // Still East's turn: nobody got a claim window, and it doesn't count as a discard.
+    expect(s.phase).toBe('turn');
+    expect(s.turn).toBe(0);
+    expect(s.discardsMade).toBe(5);
+  });
+
+  it('winning on the joker replacement is Flower Hu', () => {
+    let s = position({
+      hands: ['123d 456d 789d EEE 5d J', '4d 5d 7d 9d S W N Rd Gd Wd 2d 6d 8d', '2d 6d 9d S W N Rd Gd 7d 8d 1d 3d'],
+      wall: '2d 5d',
+      bonus: ['A1', 'A2', 'A3'],
+    });
+    s = act(s, { type: 'discardJoker', player: 0 });
+    s = act(s, { type: 'selfWin', player: 0 });
+    const keys = s.result!.score!.items.map((i) => i.key);
+    expect(keys).toContain('flowerHu');
+    expect(keys).toContain('discardedJokers');
+  });
+
+  it("a joker set aside doesn't use up East's first discard for Earthly Slam", () => {
+    let s = position({
+      hands: ['5d J 6d 9d E S W N Rd Gd Wd 1d 9d E', '123d 456d 789d EEE 5d', '2d 6d 9d S W N Rd Gd 7d 8d 1d 3d'],
+      wall: '2d 3d',
+      bonus: ['A1', '', 'A3'],
+    });
+    s.discardsMade = 0;
+    s = act(s, { type: 'discardJoker', player: 0 });
+    s = act(s, { type: 'discard', player: 0, tile: parse('5d')[0] });
     s = act(s, { type: 'win', player: 1 });
-    expect(s.result!.winner).toBe(1);
-    // The joker moved to South's hand, so East no longer has a discarded joker.
-    expect(s.players[0].discardedJokers).toBe(0);
-    expect(s.result!.jokers).toEqual([0, 1, 2]);
+    expect(s.result!.score!.items.map((i) => i.key)).toContain('earthly');
+  });
+
+  it('a joker cannot be set aside once the wall is empty', () => {
+    const s = jokerPosition();
+    s.head = s.tail;
+    expect(has(s, 0, 'discardJoker')).toBe(false);
   });
 
   it('drawing the real tile swaps out the joker in an exposed pong; the joker returns to hand (Q3)', () => {
