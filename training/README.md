@@ -43,7 +43,9 @@ training\.venv\Scripts\python training\train.py --start --run main  # trains; re
 ```
 
 - Pause: create an empty file `training\PAUSE`; delete it to resume. Stop: create `training\STOP` (it saves first).
-- It pauses by itself if the GPU reaches 82 C, and resumes at 70 C.
+- The GPU temperature is written to the log. Pausing when hot is off by default (Sean's choice; the card
+  throttles itself); add `--pause-when-hot` to pause at 82 C and resume at 70 C.
+- No power cap by default (Sean's choice). `gpu-power-cap.ps1` is there if wanted.
 - It uses 8 game-server processes and 4 PyTorch threads by default, leaving cores for the CloudPanel VM.
 - Progress: `training\runs\<run>\log.csv` (speed, losses, GPU temperature, and RM/round against the normal bot).
 

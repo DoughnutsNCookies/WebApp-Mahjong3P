@@ -9,7 +9,7 @@ Nothing runs without --start:
     py training/train.py --start --run main   trains, resuming training/runs/main if it exists
 
 While it runs: create training/PAUSE to pause (delete it to resume), training/STOP to save and quit.
-It also pauses by itself if the GPU passes 82 C, and resumes below 70 C.
+The GPU temperature is logged; --pause-when-hot also pauses above 82 C until it is back under 70 C.
 """
 
 from __future__ import annotations
@@ -49,6 +49,7 @@ def parse():
     ap.add_argument("--eval-deals", type=int, default=300)
     ap.add_argument("--save-every", type=int, default=10, help="updates between checkpoints")
     ap.add_argument("--torch-threads", type=int, default=4)
+    ap.add_argument("--pause-when-hot", action="store_true", help="pause above 82 C (off by default)")
     return ap.parse_args()
 
 
@@ -158,7 +159,7 @@ def main():
         writer.writerow(["time", "update", "decisions_per_s", "policy_loss", "value_loss", "entropy", "gpu_c", "vs_normal_rm", "margin"])
 
     rollouts = Rollouts(args.gae_lambda)
-    watchdog = Watchdog()
+    watchdog = Watchdog(pause_when_hot=args.pause_when_hot)
     t_last, decisions = time.time(), 0
     try:
         while True:

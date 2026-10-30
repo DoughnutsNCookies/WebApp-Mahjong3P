@@ -1,5 +1,6 @@
-"""Keeps a training run gentle on BEAST: watches the GPU temperature, and lets Sean pause or stop a run
-by creating a file (training/PAUSE or training/STOP), no terminal needed."""
+"""Lets Sean pause or stop a run by creating a file (training/PAUSE or training/STOP), no terminal needed,
+and reads the GPU temperature for the log. Pausing when the GPU is hot is optional (--pause-when-hot);
+Sean chose to leave it off on 2026-10-30 (the card throttles itself)."""
 
 from __future__ import annotations
 
@@ -33,7 +34,8 @@ def gpu_status() -> dict:
 class Watchdog:
     """Polls the GPU every `every` seconds. `hot` is set while the GPU is too warm."""
 
-    def __init__(self, every: float = 15.0):
+    def __init__(self, every: float = 15.0, pause_when_hot: bool = False):
+        self.pause_when_hot = pause_when_hot
         self.hot = threading.Event()
         self.last: dict = {}
         self._stop = threading.Event()
@@ -44,7 +46,7 @@ class Watchdog:
         while not self._stop.is_set():
             self.last = gpu_status()
             t = self.last.get("temp")
-            if t is not None:
+            if t is not None and self.pause_when_hot:
                 if t >= HOT_C:
                     self.hot.set()
                 elif t <= COOL_C:
