@@ -17,6 +17,8 @@ interface Props {
   revealed?: Kind[][] | null;
   /** Player whose turn it is, for highlighting. */
   active?: number;
+  /** The round's winner, whose box is shown in gold. */
+  winner?: number;
   /** The newest discard on the table, to highlight. */
   lastDiscard?: { player: number; index: number } | null;
   /** Your hand row, rendered by the caller (it handles selection and hints). */
@@ -67,7 +69,7 @@ function River({ tiles, highlight }: { tiles: Kind[]; highlight?: number }) {
     </Zone>
   );
 }
-export function Table({ view, names, tally, revealed, active, lastDiscard, hand }: Props) {
+export function Table({ view, names, tally, revealed, active, winner, lastDiscard, hand }: Props) {
   const me = view.me;
   // Turn order is East -> South -> West: the player after you sits on your right.
   const left = (me + 2) % 3;
@@ -77,9 +79,13 @@ export function Table({ view, names, tally, revealed, active, lastDiscard, hand 
     const o = view.players[p];
     const f = loserFan(o.seat, revealed ? revealed[p] : [], o.melds, o.bonus, o.discardedJokers);
     return (
-      <section className={`opp${active === p ? ' active' : ''}`} aria-label={`${names[p]}, on your ${side}`}>
+      <section
+        className={`opp${active === p ? ' active' : ''}${winner === p ? ' winner' : ''}`}
+        aria-label={`${names[p]}, on your ${side}${winner === p ? ', winner' : ''}`}
+      >
         <header>
           <strong>{names[p]}</strong>
+          {winner === p && <span className="win-badge">Hu!</span>}
           <span className="seat">{SEAT_NAMES[o.seat]}{p === view.dealer ? ' · dealer' : ''}</span>
           <FanChip fan={f.fan} items={f.items} hiddenNote={!revealed} />
           {tally && <span className={`money ${tally[p] < 0 ? 'neg' : ''}`}>{rmShort(tally[p])}</span>}
@@ -102,9 +108,10 @@ export function Table({ view, names, tally, revealed, active, lastDiscard, hand 
         {opponent(left, 'left')}
         {opponent(right, 'right')}
       </div>
-      <section className={`me${active === me ? ' active' : ''}`} aria-label="Your area">
+      <section className={`me${active === me ? ' active' : ''}${winner === me ? ' winner' : ''}`} aria-label={winner === me ? 'Your area, winner' : 'Your area'}>
         <header>
           <strong>{names[me]}</strong>
+          {winner === me && <span className="win-badge">Hu!</span>}
           <span className="seat">{SEAT_NAMES[view.seat]}{me === view.dealer ? ' · dealer' : ''}</span>
           <FanChip fan={mine.fan} items={mine.items} />
           {tally && <span className={`money ${tally[me] < 0 ? 'neg' : ''}`}>{rmShort(tally[me])}</span>}

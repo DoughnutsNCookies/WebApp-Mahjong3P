@@ -109,6 +109,7 @@ export function Game({ game, names, levels, tally, onAct, onNext, onReview }: {
         tally={tally}
         revealed={view.revealedHands}
         active={view.phase === 'turn' ? view.turn : undefined}
+        winner={game.result?.winner}
         lastDiscard={lastDiscardOf(game)}
         hand={
           <HandRow

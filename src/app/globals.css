@@ -103,6 +103,9 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
 .opponents { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .opp, .me { border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: var(--panel); min-width: 0; }
 .opp.active, .me.active { border-color: var(--green); }
+/* The round's winner: a gold box. */
+.opp.winner, .me.winner { border: 2px solid #b8892b; background: #fbf1d6; }
+.win-badge { background: #b8892b; color: #fff; font-weight: 700; font-size: 0.75rem; border-radius: 999px; padding: 2px 8px; }
 .opp header, .me header { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; font-size: 0.9rem; }
 .opp header .money, .me header .money { margin-left: auto; }
 .seat { color: var(--muted); font-size: 0.8rem; }
