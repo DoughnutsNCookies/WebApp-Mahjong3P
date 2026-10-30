@@ -1,4 +1,4 @@
-﻿"""Writes a plain-English progress page for a training run: training/runs/<run>/progress.html.
+"""Writes a plain-English progress page for a training run: training/runs/<run>/progress.html.
 Only reads the run's log files, so it never disturbs a run in progress.
 
     py training/progress.py            (run "main")
@@ -327,7 +327,7 @@ def build_compare() -> Path:
             p["avg"] = sum(q["rm"] for q in pts[i - 2:i + 1]) / 3 if i >= 2 else None
         series.append({**line, "pts": pts, "segs": segs, "total": offset})
     paired_path = HERE / "runs" / "paired.json"
-    paired = json.loads(paired_path.read_text()) if paired_path.exists() else []
+    paired = json.loads(paired_path.read_text(encoding="utf-8-sig")) if paired_path.exists() else []
 
     W, H, L, R, T, B = 760, 340, 56, 110, 20, 44
     allp = [p for s in series for p in s["pts"]]
