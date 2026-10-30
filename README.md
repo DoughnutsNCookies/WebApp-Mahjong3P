@@ -53,6 +53,7 @@ npm run build && npm run ui-check   # build, then play a round in phone WebKit a
 npx tsx scripts/sim.ts 2000    # random rounds in Node
 npx tsx scripts/bots.ts 500 normal,easy,easy     # bot vs bot, duplicate format
 npx tsx scripts/calibrate.ts                      # refit the advanced bot's win/lose rates
+npx tsx scripts/import.ts pasted.txt              # rebuild a hand from a 'Copy for Claude' export
 npx tsx scripts/analyze.ts "12d 456d RdRd Gd 99d E S N J" --bonus "F1"   # analyze a hand
 ```
 
