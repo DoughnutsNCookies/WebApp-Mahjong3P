@@ -9,8 +9,8 @@ two bots with hints and a post-hand review.
 | Milestone | State |
 |---|---|
 | 1. Rules engine with tests | Done |
-| 2. Hand analyzer (shanten, live tiles, reachable fan, safety) | Next |
-| 3. Rule-based bots (easy / normal) | |
+| 2. Hand analyzer (shanten, live tiles, reachable fan, safety) | Done |
+| 3. Rule-based bots (easy / normal) | Next |
 | 4. Playable game in the browser | |
 | 5. Self-play training (optional) | |
 
@@ -25,6 +25,10 @@ two bots with hints and a post-hand review.
   - `money.ts`: fan payout, fei (joker) money, loser settlement
   - `game.ts`: one round as a state machine: deal, draws, claims, kongs, robbing, wall end, settlement
   - `view.ts`: what one player may see (for a future multiplayer server)
+- `src/analyzer/`: the hand analyzer, also pure TypeScript. For each discard: shanten (tiles from ready),
+  live tiles that improve the hand, the fan outlook (finished fan, open fan routes, every wait and what it
+  pays once ready, whether 5 and 10 fan are realistic), a safety estimate against each opponent, joker
+  keep/set-aside advice and loser-settlement fan. Every number comes with a plain-English reason.
 - `tests/`: Vitest tests. Each rule and worked example from the house rules has its own test.
 - `scripts/sim.ts`: plays random rounds in Node and counts what happened.
 
@@ -38,6 +42,7 @@ npm test                       # all tests
 npm run typecheck
 npm run lint
 npx tsx scripts/sim.ts 2000    # random rounds in Node
+npx tsx scripts/analyze.ts "12d 456d RdRd Gd 99d E S N J" --bonus "F1"   # analyze a hand
 ```
 
 ## Rules

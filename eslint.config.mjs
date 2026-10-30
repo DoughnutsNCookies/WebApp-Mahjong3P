@@ -5,10 +5,10 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  // The rules engine must stay pure TypeScript so it also runs in Node (bot simulations, a future
+  // The rules engine and analyzer must stay pure TypeScript so it also runs in Node (bot simulations, a future
   // multiplayer server, self-play training).
   {
-    files: ["src/engine/**/*.ts"],
+    files: ["src/engine/**/*.ts", "src/analyzer/**/*.ts"],
     rules: {
       "no-restricted-imports": ["error", { patterns: ["react", "react-*", "react/*", "next", "next/*", "@/*"] }],
       "no-restricted-globals": ["error", "window", "document", "localStorage", "sessionStorage", "navigator"],
