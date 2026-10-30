@@ -31,7 +31,7 @@ await mkdir(SHOTS, { recursive: true });
 const failures = [];
 const runs = [
   { name: 'phone-webkit', browser: webkit, context: { ...devices['iPhone 13'] } },
-  { name: 'desktop-chromium', browser: chromium, context: { viewport: { width: 1280, height: 900 } } },
+  { name: 'desktop-chromium', browser: chromium, context: { viewport: { width: 1280, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] } },
 ];
 
 for (const run of runs) {
@@ -104,6 +104,13 @@ for (const run of runs) {
   if (!(await result.isVisible())) fail('round did not finish within 2 minutes');
   else {
     await shot('3-result');
+    if (run.name === 'desktop-chromium') {
+      // Copy for Claude: the clipboard gets a report ending in a replay code.
+      await result.getByRole('button', { name: 'Copy for Claude' }).click();
+      await result.getByRole('button', { name: 'Copied ✓' }).waitFor({ timeout: 15000 }).catch(() => fail('Copy for Claude did not confirm'));
+      const copied = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '');
+      if (!copied.startsWith('3P Mahjong hand') || !/^MJ3P1\|seed=\d+/m.test(copied)) fail('copied report is incomplete');
+    }
     await result.getByRole('button', { name: 'Review my play' }).click();
     await page.getByRole('heading', { name: 'Review' }).waitFor();
     await page.getByText('Analysing your play…').waitFor({ state: 'detached', timeout: 20000 }).catch(() => fail('review never finished'));

@@ -310,7 +310,9 @@ export function waitingFor(s: GameState): number[] {
 // ---------------------------------------------------------------------------------------------------
 // Applying actions
 
-const sameAction = (a: Action, b: Action) => JSON.stringify(a) === JSON.stringify(b);
+/** Same action, whatever order its fields were written in (actions can come from a decoded log). */
+const canonical = (a: Action) => JSON.stringify(Object.keys(a).sort().map((k) => [k, (a as Record<string, unknown>)[k]]));
+const sameAction = (a: Action, b: Action) => canonical(a) === canonical(b);
 
 export function applyAction(state: GameState, action: Action): GameState {
   if (!legalActions(state, action.player).some((a) => sameAction(a, action))) {

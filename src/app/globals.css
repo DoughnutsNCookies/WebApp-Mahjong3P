@@ -168,6 +168,10 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
 .chip { border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; font-size: 0.8rem; font-weight: 600; }
 .review-hand { display: flex; flex-wrap: wrap; gap: 2px; margin: 6px 0; }
 
+/* Copy for Claude fallback */
+.copy-box { flex-basis: 100%; }
+.copy-box textarea { width: 100%; font: 0.8rem/1.4 ui-monospace, Menlo, Consolas, monospace; border: 1px solid var(--line); border-radius: 6px; padding: 6px; background: var(--tile); }
+
 /* Saved hands, replay, settings */
 .log-list { list-style: none; padding: 0; margin: 0; }
 .log-list li { border-bottom: 1px solid var(--line); padding: 10px 0; }

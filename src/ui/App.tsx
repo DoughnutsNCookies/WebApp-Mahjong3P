@@ -32,7 +32,7 @@ export function App() {
         {tab === 'play' && !m.game && <p className="muted">Shuffling…</p>}
         {tab === 'play' && m.game && !reviewing && (
           <Game
-            game={m.game} names={names} tally={m.match.tally}
+            game={m.game} names={names} levels={m.settings.levels} tally={m.match.tally}
             onAct={m.act}
             onNext={m.nextRound}
             onReview={() => setReviewing(true)}

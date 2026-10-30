@@ -2,11 +2,14 @@
 
 // End of round: who won and how, the fan breakdown and every payment (fan payout, fei, loser settlement).
 
+import { ReportInput } from '../analyzer';
 import { CAP, RoundResult } from '../engine';
+import { CopyReport } from './CopyReport';
 import { rmShort } from './format';
 
-export function ResultPanel({ result, names, onReview, onNext }: {
+export function ResultPanel({ result, names, report, onReview, onNext }: {
   result: RoundResult;
+  report: ReportInput;
   names: string[];
   onReview: () => void;
   onNext?: () => void;
@@ -48,6 +51,7 @@ export function ResultPanel({ result, names, onReview, onNext }: {
       <p className="note">Jokers held: {r.jokers.map((j, p) => `${names[p]} ${j}`).join(', ')}.</p>
       <div className="actions">
         <button type="button" className="btn" onClick={onReview}>Review my play</button>
+        <CopyReport input={report} />
         {onNext && <button type="button" className="btn primary" onClick={onNext}>Next round</button>}
       </div>
     </div>

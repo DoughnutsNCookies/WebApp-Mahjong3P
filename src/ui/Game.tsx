@@ -55,8 +55,9 @@ function HandRow({ hand, drawn, selected, best, onTap }: {
   );
 }
 
-export function Game({ game, names, tally, onAct, onNext, onReview }: {
+export function Game({ game, names, levels, tally, onAct, onNext, onReview }: {
   game: GameState;
+  levels: string[];
   names: string[];
   tally: number[];
   onAct: (a: Action) => void;
@@ -177,7 +178,10 @@ export function Game({ game, names, tally, onAct, onNext, onReview }: {
         <BonusLegend seat={view.seat} />
 
         {view.phase === 'ended' && game.result && (
-          <ResultPanel result={game.result} names={names} onReview={onReview} onNext={onNext} />
+          <ResultPanel
+            result={game.result} names={names} onReview={onReview} onNext={onNext}
+            report={{ seed: game.seed, dealer: game.dealer, actions: game.actions, rules: game.rules, levels, date: new Date().toISOString() }}
+          />
         )}
       </div>
     </>

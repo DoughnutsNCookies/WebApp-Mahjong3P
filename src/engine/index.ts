@@ -7,3 +7,4 @@ export * from './scoring';
 export * from './money';
 export * from './game';
 export * from './view';
+export * from './codec';

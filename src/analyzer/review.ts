@@ -40,7 +40,7 @@ function explain(played: DiscardOption, best: DiscardOption): string {
   if (best.fan.reaches5 !== played.fan.reaches5 && ['no', 'unlikely'].includes(played.fan.reaches5)) {
     return `After ${name(played.tile)}, reaching 5 fan was ${played.fan.reaches5 === 'no' ? 'out of reach' : 'unlikely'}; after ${name(best.tile)} it was ${best.fan.reaches5}.`;
   }
-  if (played.safety.risk > best.safety.risk + 0.15) {
+  if (played.safety.risk > best.safety.risk + 0.15 && played.safety.label !== best.safety.label) {
     return `${name(played.tile)} was ${played.safety.label} risk to discard; ${name(best.tile)} was ${best.safety.label}.`;
   }
   if (best.ukeireTotal > played.ukeireTotal) {

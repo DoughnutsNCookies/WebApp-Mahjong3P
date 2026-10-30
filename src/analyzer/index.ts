@@ -6,3 +6,4 @@ export * from './shanten';
 export * from './inputs';
 export * from './claims';
 export * from './review';
+export * from './report';
