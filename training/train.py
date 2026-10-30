@@ -177,8 +177,8 @@ class Benchmarks:
             [sys.executable, str(HERE / "evaluate.py"), "--checkpoint", str(path), "--deals", str(deals or self.deals),
              "--bots", self.bots, "--json", str(self.run_dir / "bench.json"),
              # Fresh deals for every regular benchmark (the pilot reused one set, which flattered the
-             # "best" version); the confirming benchmark uses its own set, never used for picking.
-             "--seed", str(424242 if kind == "confirm" else 1000 + update)],
+             # "best" version); confirming benchmarks use their own fresh sets, never used for picking.
+             "--seed", str(500000 + update if kind == "confirm" else 1000 + update)],
             cwd=HERE.parent, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
         return True
