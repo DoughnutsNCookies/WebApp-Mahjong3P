@@ -11,8 +11,13 @@ two bots with hints and a post-hand review.
 | 1. Rules engine with tests | Done |
 | 2. Hand analyzer (shanten, live tiles, reachable fan, safety) | Done |
 | 3. Rule-based bots (easy / normal) | Done |
-| 4. Playable game in the browser | Done (hosting on CloudPanel pending) |
-| 5. Self-play training (optional) | |
+| 4. Playable game in the browser | Done, live at mahjong.schuahsolutions.com |
+| 5. Self-play training | In progress: v2 beats the normal bot (see the journal) |
+
+## Journal
+
+`docs/JOURNAL.md` records what was built, the rule decisions, every training run and its results, and the bugs
+found, day by day.
 
 ## Layout
 
