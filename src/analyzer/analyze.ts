@@ -268,8 +268,12 @@ function fanOutlook(input: AnalyzerInput, hand13: Kind[], sh: number, live: numb
   // Shape plans don't all fit together; count the best of them.
   const shape = new Set(['suitFlush', 'allPongs', 'sevenPairs']);
   const bestShape = Math.max(0, ...onTrack.filter((p) => shape.has(p.key)).map((p) => p.fan));
-  const estimate = Math.min(CAP, locked + bestShape + onTrack.filter((p) => !shape.has(p.key)).reduce((a, p) => a + p.fan, 0));
-  const possibleMax = Math.min(CAP, estimate + plans.filter((p) => p.status === 'possible').reduce((a, p) => a + p.fan, 0));
+  const others = onTrack.filter((p) => !shape.has(p.key));
+  // `planned` (for judging whether 5 fan is likely) counts Flowerless when it's on track; the estimate
+  // shown to the player doesn't, because one bonus draw ends it.
+  const planned = Math.min(CAP, locked + bestShape + others.reduce((a, p) => a + p.fan, 0));
+  const estimate = Math.min(CAP, locked + bestShape + others.filter((p) => p.key !== 'flowerless').reduce((a, p) => a + p.fan, 0));
+  const possibleMax = Math.min(CAP, planned + plans.filter((p) => p.status === 'possible').reduce((a, p) => a + p.fan, 0));
   const ten = plans.filter((p) => p.fan >= CAP).sort((a, b) => (a.status === 'on track' ? -1 : 1) - (b.status === 'on track' ? -1 : 1));
   const pathTo10 = estimate >= CAP ? 'Already at 10' : ten[0] ? `${ten[0].label} (${ten[0].status})` : null;
 
@@ -307,7 +311,7 @@ function fanOutlook(input: AnalyzerInput, hand13: Kind[], sh: number, live: numb
     return out;
   }
 
-  out.reaches5 = estimate >= 5 ? 'likely' : possibleMax >= 5 ? 'unlikely' : 'no';
+  out.reaches5 = planned >= 5 ? 'likely' : possibleMax >= 5 ? 'unlikely' : 'no';
   return out;
 }
 

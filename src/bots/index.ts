@@ -7,8 +7,8 @@
 //   advanced: normal, plus money-based play once ready (see advanced.ts): may turn down a win under
 //           10 fan when holding out is worth more, and picks its wait by expected payout.
 
-import { analyze, AnalyzerInput, DiscardOption, inputFromView, liveCounts, shanten } from '../analyzer';
-import { Action, GameState, JOKER, Kind, Meld, playerView, Slot } from '../engine';
+import { afterClaim, analyze, AnalyzerInput, DiscardOption, inputFromView, liveCounts, shanten } from '../analyzer';
+import { Action, GameState, JOKER, Kind, playerView } from '../engine';
 import { bestReadyDiscard, decideWin } from './advanced';
 
 export type BotLevel = 'easy' | 'normal' | 'advanced';
@@ -88,29 +88,6 @@ function turnAction(input: AnalyzerInput, legal: Action[], level: BotLevel): Act
 
 // ---------------------------------------------------------------------------------------------------
 // Claiming a discard
-
-/** The hand and melds after making a claim, ready to discard. */
-function afterClaim(input: AnalyzerInput, a: Action, tile: Kind): AnalyzerInput | null {
-  let hand = input.hand.slice();
-  const take = (k: Kind) => { hand = removeOne(hand, k); };
-  let meld: Meld;
-  if (a.type === 'pong' || a.type === 'claimKong') {
-    const size = a.type === 'pong' ? 3 : 4;
-    for (let i = 0; i < size - 1 - a.jokers; i++) take(tile);
-    for (let i = 0; i < a.jokers; i++) take(JOKER);
-    const slots: Slot[] = [...Array(size)].map((_, i) => ({ kind: tile, joker: i >= size - a.jokers }));
-    meld = { type: a.type === 'pong' ? 'pong' : 'kong', slots, concealed: false };
-  } else if (a.type === 'chow') {
-    const slots: Slot[] = [];
-    for (let k = a.start; k < a.start + 3; k++) {
-      const joker = a.jokerKinds.includes(k);
-      if (k !== tile) take(joker ? JOKER : k);
-      slots.push({ kind: k, joker: k !== tile && joker });
-    }
-    meld = { type: 'chow', slots, concealed: false };
-  } else return null;
-  return { ...input, hand, melds: [...input.melds, meld] };
-}
 
 function claimAction(input: AnalyzerInput, legal: Action[], tile: Kind, level: BotLevel): Action {
   const pass = legal.find((a) => a.type === 'pass')!;

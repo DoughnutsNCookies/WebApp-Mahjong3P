@@ -43,3 +43,7 @@ next-env.d.ts
 # deploy settings stay on the deploying PC (public repo)
 cloudpanel.json
 
+
+# UI smoke-test screenshots
+/.ui-check/
+

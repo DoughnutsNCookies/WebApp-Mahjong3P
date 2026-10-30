@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { analyze, AnalyzerInput, inputFromState, inputFromView, liveCounts, shanten } from '../src/analyzer';
+import { analyze, AnalyzerInput, inputFromState, inputFromView, liveCounts, reviewRound, shanten, worstMistakes } from '../src/analyzer';
 import {
-  applyAction, countHand, decompose, fullSet, JOKER, legalActions, makeRng, newRound, parse, playerView, PLAYABLE,
+  Action, applyAction, countHand, decompose, fullSet, JOKER, legalActions, makeRng, newRound, parse, playerView, PLAYABLE,
   Seat, shuffle, waitingFor,
 } from '../src/engine';
 import { meld } from './helpers';
@@ -162,6 +162,61 @@ describe('joker advice', () => {
   it('reports the cost of setting a joker aside', () => {
     const a = analyze(input('123d 456d 789d EE J S'));
     expect(a.joker!.setAside).toBeGreaterThan(a.joker!.keep);
+  });
+});
+
+describe('post-hand review', () => {
+  // Player 0 deliberately discards the analyzer's worst option every turn; the others play normally.
+  function badRound(seed: number) {
+    let s = newRound(seed, 0);
+    while (s.phase !== 'ended') {
+      const p = waitingFor(s)[0];
+      const legal = legalActions(s, p);
+      let a: Action | null = legal.find((x) => x.type === 'win' || x.type === 'selfWin') ?? null;
+      if (!a && p === 0 && s.phase === 'turn') {
+        const opts = analyze(inputFromState(s, 0)).options;
+        if (opts.length) a = { type: 'discard', player: 0, tile: opts[opts.length - 1].tile };
+      }
+      s = applyAction(s, a ?? legal.find((x) => x.type === 'pass') ?? legal.find((x) => x.type === 'discard') ?? legal[0]);
+    }
+    return s;
+  }
+
+  it('flags deliberately bad discards and explains them', () => {
+    let flagged = 0;
+    let total = 0;
+    for (const seed of [11, 12, 13]) {
+      const s = badRound(seed);
+      const items = reviewRound(s.seed, s.dealer, s.actions, 0);
+      const discards = items.filter((x) => x.kind === 'discard');
+      total += discards.length;
+      flagged += discards.filter((x) => x.verdict === 'mistake' || x.verdict === 'big mistake').length;
+      for (const x of discards) {
+        expect(x.note.length).toBeGreaterThan(10);
+        if (x.verdict !== 'best') expect(x.best).not.toBe(x.played);
+      }
+      const worst = worstMistakes(items);
+      expect(worst.length).toBeLessThanOrEqual(3);
+      for (let i = 1; i < worst.length; i++) expect(worst[i - 1].loss).toBeGreaterThanOrEqual(worst[i].loss);
+    }
+    expect(total).toBeGreaterThan(0);
+    expect(flagged / total).toBeGreaterThan(0.5);
+  });
+
+  it('finds no mistakes when you follow the analyzer', () => {
+    let s = newRound(21, 0);
+    while (s.phase !== 'ended') {
+      const p = waitingFor(s)[0];
+      const legal = legalActions(s, p);
+      let a: Action | null = legal.find((x) => x.type === 'win' || x.type === 'selfWin') ?? null;
+      if (!a && p === 0 && s.phase === 'turn') {
+        const best = analyze(inputFromState(s, 0)).options[0];
+        if (best) a = { type: 'discard', player: 0, tile: best.tile };
+      }
+      s = applyAction(s, a ?? legal.find((x) => x.type === 'pass') ?? legal.find((x) => x.type === 'discard') ?? legal[0]);
+    }
+    const items = reviewRound(s.seed, s.dealer, s.actions, 0);
+    expect(items.filter((x) => x.kind === 'discard').every((x) => x.verdict === 'best')).toBe(true);
   });
 });
 
