@@ -1,7 +1,7 @@
 // Smoke test of the built site (run `npm run build` first): plays a full round in a phone-sized WebKit
 // (iPhone Safari's engine) and a desktop Chromium window, following the hint, then checks the result,
 // review, saved hands, replay, and resuming after a refresh. Screenshots go to .ui-check/.
-// Usage: node scripts/ui-check.mjs
+// Usage: node scripts/ui-check.mjs [url]   (no url: serves the local out/ folder)
 
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
@@ -23,8 +23,9 @@ const server = createServer(async (req, res) => {
     res.writeHead(404).end('not found');
   }
 });
-await new Promise((r) => server.listen(0, r));
-const base = `http://localhost:${server.address().port}/`;
+const target = process.argv[2];
+if (!target) await new Promise((r) => server.listen(0, r));
+const base = target ?? `http://localhost:${server.address().port}/`;
 await mkdir(SHOTS, { recursive: true });
 
 const failures = [];
@@ -38,8 +39,10 @@ for (const run of runs) {
   const context = await browser.newContext(run.context);
   const page = await context.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(`page error: ${e.message}`));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
+  // Cloudflare injects its analytics beacon (/cdn-cgi/rum) on the live site; WebKit blocks it. Not ours.
+  const ignored = (text) => text.includes('/cdn-cgi/');
+  page.on('pageerror', (e) => { if (!ignored(e.message)) errors.push(`page error: ${e.message}`); });
+  page.on('console', (m) => { if (m.type() === 'error' && !ignored(m.text())) errors.push(`console: ${m.text()}`); });
   const shot = (n) => page.screenshot({ path: join(SHOTS, `${run.name}-${n}.png`), fullPage: true });
   const fail = (msg) => failures.push(`${run.name}: ${msg}`);
 
@@ -112,7 +115,8 @@ for (const run of runs) {
     if (!(await replayBtn.count())) fail('finished hand was not saved');
     else {
       await replayBtn.click();
-      await page.getByRole('slider', { name: 'Move through the hand' }).fill('12');
+      const slider = page.getByRole('slider', { name: 'Move through the hand' });
+      await slider.fill(String(Math.min(12, Number(await slider.getAttribute('max')))));
       await shot('5-replay');
     }
     await page.getByRole('button', { name: 'Settings' }).click();
@@ -128,7 +132,7 @@ for (const run of runs) {
   await browser.close();
 }
 
-server.close();
+if (!target) server.close();
 if (failures.length) {
   console.log('\nFAILED:\n' + failures.join('\n'));
   process.exit(1);
