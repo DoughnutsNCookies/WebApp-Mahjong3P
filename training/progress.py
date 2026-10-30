@@ -277,5 +277,217 @@ hit.addEventListener('mouseleave', () => {{ tip.style.display = 'none'; cross.se
     return out
 
 
+# ---------------------------------------------------------------------------------------------------
+# Comparison page: v1 and v2 on one chart, against total training time.
+
+# v1 is a chain: each run started from the one before, so their times add up. (The long run actually
+# started from the trial's best point, about 0.4 h in, so v1's later times are slightly generous.)
+LINES = [
+    {"name": "v2", "runs": ["v2trial", "v2"], "cls": "s1",
+     "about": "v2: also sees the analyzer's hand-reading (hints); started from zero"},
+    {"name": "v1", "runs": ["pilot", "pilot2", "main"], "cls": "s2",
+     "about": "v1: raw tiles only; pilot, then the 1-hour trial, then the long run"},
+]
+
+
+def run_points(run: str):
+    """(hours since the run's start, check, average of last 3, update) for each regular check."""
+    d = HERE / "runs" / run
+    if not (d / "log.csv").exists():
+        return None
+    _, rows, checks, _, stop, _ = read_run(run)
+    if not rows:
+        return None
+    start = datetime.strptime(rows[0]["time"], "%Y-%m-%d %H:%M:%S")
+    end = datetime.strptime(rows[-1]["time"], "%Y-%m-%d %H:%M:%S")
+    for i, c in enumerate(checks):
+        c["avg"] = sum(x["rm"] for x in checks[i - 2:i + 1]) / 3 if i >= 2 else None
+    pts = [{"h": (c["time"] - start).total_seconds() / 3600, "rm": c["rm"], "avg": c["avg"], "u": c["update"]}
+           for c in checks if c["time"]]
+    return {"run": run, "pts": pts, "hours": (end - start).total_seconds() / 3600, "alive": running(d), "stop": stop,
+            "start": start, "updates": int(rows[-1]["update"])}
+
+
+def build_compare() -> Path:
+    now = datetime.now()
+    series = []
+    for line in LINES:
+        pts, segs, offset = [], [], 0.0
+        for run in line["runs"]:
+            r = run_points(run)
+            if not r:
+                continue
+            for p in r["pts"]:
+                pts.append({**p, "h": p["h"] + offset, "run": run})
+            segs.append({**r, "offset": offset})
+            offset += r["hours"]
+        series.append({**line, "pts": pts, "segs": segs, "total": offset})
+    paired_path = HERE / "runs" / "paired.json"
+    paired = json.loads(paired_path.read_text()) if paired_path.exists() else []
+
+    W, H, L, R, T, B = 760, 340, 56, 110, 20, 44
+    allp = [p for s in series for p in s["pts"]]
+    xmax = max([s["total"] for s in series] + [1.0])
+    vals = [p["rm"] for p in allp] + [0, TARGET]
+    ymin, ymax = min(-0.5, min(vals) - 0.05), max(0.75, max(vals) + 0.05)
+    X = lambda h: L + (W - L - R) * h / xmax
+    Y = lambda v: T + (H - T - B) * (ymax - v) / (ymax - ymin)
+    svg = [f'<svg viewBox="0 0 {W} {H}" role="img" aria-labelledby="cmp-title" class="chart">']
+    v = -2.0
+    while v <= ymax:
+        if v >= ymin:
+            svg.append(f'<line x1="{L}" x2="{W - R}" y1="{Y(v):.1f}" y2="{Y(v):.1f}" class="grid"/>'
+                       f'<text x="{L - 8}" y="{Y(v) + 4:.1f}" class="tick" text-anchor="end">{v:+.2f}</text>')
+        v += 0.25
+    hstep = 0.5 if xmax <= 4 else 1 if xmax <= 8 else 2
+    h = 0.0
+    while h <= xmax + 1e-9:
+        svg.append(f'<text x="{X(h):.1f}" y="{H - B + 18}" class="tick" text-anchor="middle">{h:g} h</text>')
+        h += hstep
+    svg.append(f'<text x="{(L + W - R) / 2}" y="{H - 6}" class="tick" text-anchor="middle">total hours of training</text>')
+    svg.append(f'<line x1="{L}" x2="{W - R}" y1="{Y(0):.1f}" y2="{Y(0):.1f}" class="ref"/>'
+               f'<text x="{W - R + 6}" y="{Y(0) + 4:.1f}" class="lab">normal bot level</text>')
+    svg.append(f'<line x1="{L}" x2="{W - R}" y1="{Y(TARGET):.1f}" y2="{Y(TARGET):.1f}" class="ref dash"/>'
+               f'<text x="{W - R + 6}" y="{Y(TARGET) + 4:.1f}" class="lab">target {TARGET:+.2f}</text>')
+    for s in series:
+        for seg in s["segs"][1:]:  # where one run hands over to the next
+            x = X(seg["offset"])
+            svg.append(f'<line x1="{x:.1f}" x2="{x:.1f}" y1="{T}" y2="{H - B}" class="handover {s["cls"]}"/>')
+        for p in s["pts"]:
+            svg.append(f'<circle cx="{X(p["h"]):.1f}" cy="{Y(p["rm"]):.1f}" r="3" class="dot {s["cls"]}"/>')
+        line = [p for p in s["pts"] if p["avg"] is not None]
+        # Break the line between runs: each run's average restarts.
+        path, prev = [], None
+        for p in line:
+            path.append(f'{"M" if prev != p["run"] else "L"}{X(p["h"]):.1f},{Y(p["avg"]):.1f}')
+            prev = p["run"]
+        if path:
+            svg.append(f'<path d="{" ".join(path)}" class="line {s["cls"]}"/>')
+            e = line[-1]
+            ly = Y(e["avg"]) - 8
+            # Keep the end label clear of the reference-line labels on the right.
+            for ref in (Y(0), Y(TARGET)):
+                if abs(ly - ref) < 14:
+                    ly = ref + 18 if ly >= ref else ref - 14
+            svg.append(f'<circle cx="{X(e["h"]):.1f}" cy="{Y(e["avg"]):.1f}" r="5" class="end {s["cls"]}"/>'
+                       f'<text x="{X(e["h"]) - 8:.1f}" y="{ly:.1f}" class="val" text-anchor="end">{s["name"]} {e["avg"]:+.2f}</text>')
+    svg.append(f'<line id="cross" class="cross" y1="{T}" y2="{H - B}" x1="-10" x2="-10"/>')
+    svg.append(f'<rect x="{L}" y="{T}" width="{W - L - R}" height="{H - T - B}" fill="transparent" id="hit"/></svg>')
+    data = [{"x": X(p["h"]), "s": s["name"], "run": p["run"], "h": round(p["h"], 2), "rm": p["rm"], "avg": p["avg"], "u": p["u"]}
+            for s in series for p in s["pts"]]
+
+    # The same moment for both: the score each had reached at v2's current training time.
+    def at(s, hrs):
+        line = [p for p in s["pts"] if p["avg"] is not None and p["h"] <= hrs]
+        return line[-1]["avg"] if line else None
+    v2 = next(s for s in series if s["name"] == "v2")
+    v1 = next(s for s in series if s["name"] == "v1")
+    same = ""
+    if v2["pts"]:
+        hrs = v2["total"]
+        a, b = at(v2, hrs), at(v1, hrs)
+        if a is not None and b is not None:
+            lead = a - b
+            same = (f"After {hours(timedelta(hours=hrs))} of training: v2 {money(a)}, v1 {money(b)} at the same point. "
+                    + ("v2 is ahead" if lead > 0.15 else "v1 is ahead" if lead < -0.15 else "about level") + " (averages of 3 checks, each ±0.2).")
+    runs_rows = "".join(
+        f"<tr><td><span class='key {s['cls']}'></span>{s['name']}</td><td>{seg['run']}</td>"
+        f"<td>{seg['start']:%a %H:%M}</td><td>{hours(timedelta(hours=seg['hours']))}</td><td>{seg['updates']:,}</td>"
+        f"<td>{'running' if seg['alive'] else html.escape(seg['stop'] or 'stopped')}</td>"
+        f"<td>{money(sum(p['rm'] for p in seg['pts'][-6:]) / len(seg['pts'][-6:])) if seg['pts'] else '–'}</td></tr>"
+        for s in series for seg in s["segs"])
+    paired_rows = "".join(
+        f"<tr><td>{html.escape(p['version'])}</td><td>{html.escape(p['label'])}</td><td><b>{money(p['rm'])}</b> ± {p['margin']:.2f}</td>"
+        f"<td>{p['deals']:,} deals (seed {p['seed']})</td><td>{html.escape(p['date'])}</td></tr>" for p in paired)
+
+    page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Mahjong AI: v1 vs v2</title>
+<style>
+.viz-root {{ color-scheme: light; --surface-1:#fcfcfb; --surface-2:#f3f2ee; --line:#d9d7cf; --text-primary:#0b0b0b;
+  --text-secondary:#52514e; --muted:#8a8880; --series-1:#2a78d6; --series-2:#eb6834; }}
+@media (prefers-color-scheme: dark) {{ :root:where(:not([data-theme="light"])) .viz-root {{ color-scheme: dark;
+  --surface-1:#1a1a19; --surface-2:#232321; --line:#3a3936; --text-primary:#f0efec; --text-secondary:#c3c2b7; --muted:#8f8d85;
+  --series-1:#3987e5; --series-2:#d95926; }} }}
+body {{ margin:0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }}
+.viz-root {{ background:var(--surface-1); color:var(--text-primary); min-height:100vh; padding:20px; box-sizing:border-box; }}
+main {{ max-width:900px; margin:0 auto; }} h1 {{ font-family: Georgia, serif; font-size:1.5rem; margin:0 0 4px; }}
+h2 {{ font-family: Georgia, serif; font-size:1.1rem; margin:24px 0 8px; }} .sub {{ color:var(--text-secondary); font-size:.9rem; margin:0 0 14px; }}
+.lead {{ border:1px solid var(--line); border-radius:6px; padding:10px 12px; }}
+.chart-wrap {{ position:relative; }} .chart {{ width:100%; height:auto; display:block; }}
+.grid {{ stroke:var(--line); }} .tick {{ fill:var(--text-secondary); font-size:11px; }} .ref {{ stroke:var(--muted); stroke-width:1.5; }}
+.dash {{ stroke-dasharray:5 4; }} .lab {{ fill:var(--text-secondary); font-size:12px; }} .val {{ fill:var(--text-primary); font-size:12px; font-weight:600; }}
+.line {{ fill:none; stroke-width:2; stroke-linejoin:round; }} .line.s1 {{ stroke:var(--series-1); }} .line.s2 {{ stroke:var(--series-2); }}
+.dot {{ opacity:.35; }} .dot.s1, .end.s1 {{ fill:var(--series-1); }} .dot.s2, .end.s2 {{ fill:var(--series-2); }} .end {{ stroke:var(--surface-1); stroke-width:2; }}
+.handover {{ stroke-dasharray:2 4; stroke-width:1; opacity:.6; }} .handover.s1 {{ stroke:var(--series-1); }} .handover.s2 {{ stroke:var(--series-2); }}
+.cross {{ stroke:var(--text-secondary); }}
+.legend {{ display:flex; gap:18px; font-size:.85rem; color:var(--text-secondary); flex-wrap:wrap; margin:4px 0 6px; }}
+.key {{ display:inline-block; width:18px; height:3px; vertical-align:middle; margin-right:6px; }} .key.s1 {{ background:var(--series-1); }} .key.s2 {{ background:var(--series-2); }}
+#tip {{ position:absolute; pointer-events:none; background:var(--surface-1); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:.8rem; display:none; white-space:nowrap; }}
+table {{ border-collapse:collapse; width:100%; font-size:.85rem; font-variant-numeric:tabular-nums; }} td,th {{ border-bottom:1px solid var(--line); padding:5px 6px; text-align:left; vertical-align:top; }}
+ul, dl {{ font-size:.9rem; }} .foot {{ color:var(--muted); font-size:.8rem; margin-top:24px; }}
+</style></head><body><div class="viz-root"><main>
+<h1>Mahjong AI: v1 vs v2</h1>
+<p class="sub">Refreshed {now:%a %d %b, %H:%M}. Double-click <b>Update progress.bat</b> to refresh. Each run's own page: {" · ".join(f'<a href="{seg["run"]}/progress.html">{seg["run"]}</a>' for s in series for seg in s["segs"])}</p>
+<p class="lead">{html.escape(same) or "v2 needs a few checks before it can be compared."}</p>
+
+<h2 id="cmp-title">Score against two normal bots, by total training time</h2>
+<div class="legend">{"".join(f'<span><span class="key {s["cls"]}"></span>{html.escape(s["about"])}</span>' for s in series)}</div>
+<div class="chart-wrap">{''.join(svg)}<div id="tip" role="status"></div></div>
+<p class="sub">Lines: average of the last 3 checks. Faint dots: single checks (±0.35 each). Dotted upright lines: one run handing over to the next.
+v1's early checks are less precise (the pilot used 150 deals, and the 1-hour trial reused the same deals each time, which flattered it a little).</p>
+
+<h2>The fair verdict: paired benchmarks</h2>
+<p class="sub">The chart's checks are quick and noisy. These use the same 1,000 deals (3,000 rounds) for every version, so luck cancels out.
+They're the numbers to decide on. v2 gets its row when its trial ends.</p>
+<table><thead><tr><th>Version</th><th>What was measured</th><th>Score vs normal bots</th><th>Deals</th><th>When</th></tr></thead><tbody>{paired_rows}</tbody></table>
+
+<h2>The runs</h2>
+<table><thead><tr><th></th><th>Run</th><th>Started</th><th>Trained for</th><th>Updates</th><th>Status</th><th>Last 6 checks</th></tr></thead><tbody>{runs_rows}</tbody></table>
+
+<h2>What's different in v2</h2>
+<ul>
+<li><b>Hints:</b> for each possible discard it is told how close to ready that leaves it and how many live tiles would help; for each claim, how close to ready it would be. v1 had to work this out from raw tiles.</li>
+<li><b>Steadier learning:</b> it learns from 262,000 decisions per update instead of 65,000, in smaller steps, so luck in single rounds misleads it less.</li>
+<li><b>Different opponents:</b> about 6% of its games are against easy bots, as well as itself and its older versions.</li>
+<li><b>Faster setup:</b> the game processes no longer wait for each other.</li>
+</ul>
+<p class="foot">Built from training/runs/*/log.csv, console.log and runs/paired.json. Reading these never disturbs a running training.</p>
+</main></div>
+<script>
+const pts = {json.dumps(data)};
+const hit = document.getElementById('hit'), tip = document.getElementById('tip'), cross = document.getElementById('cross');
+const svg = hit.ownerSVGElement;
+const fmt = (v) => (v >= 0 ? '+RM' : '-RM') + Math.abs(v).toFixed(2);
+hit.addEventListener('mousemove', (e) => {{
+  if (!pts.length) return;
+  const p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY;
+  const x = p.matrixTransform(svg.getScreenCTM().inverse()).x;
+  let best = pts[0]; for (const q of pts) if (Math.abs(q.x - x) < Math.abs(best.x - x)) best = q;
+  const near = pts.filter((q) => Math.abs(q.x - best.x) < 6);
+  cross.setAttribute('x1', best.x); cross.setAttribute('x2', best.x);
+  tip.style.display = 'block';
+  tip.innerHTML = `${{best.h}} h of training<br>` + near.map((q) => `<b>${{q.s}}</b> (${{q.run}}, update ${{q.u}}): check ${{fmt(q.rm)}}` +
+    (q.avg === null ? '' : `, average ${{fmt(q.avg)}}`)).join('<br>');
+  const r = svg.getBoundingClientRect(), w = svg.parentElement.getBoundingClientRect();
+  tip.style.left = Math.min(r.left - w.left + best.x / {W} * r.width + 12, w.width - 330) + 'px'; tip.style.top = '30px';
+}});
+hit.addEventListener('mouseleave', () => {{ tip.style.display = 'none'; cross.setAttribute('x1', -10); cross.setAttribute('x2', -10); }});
+</script></body></html>"""
+    out = HERE / "runs" / "compare.html"
+    out.write_text(page, encoding="utf-8")
+    return out
+
+
+def latest_run() -> str:
+    """The run whose log changed most recently (the one running now, or the last one)."""
+    logs = sorted((HERE / "runs").glob("*/log.csv"), key=lambda p: p.stat().st_mtime)
+    return logs[-1].parent.name if logs else "main"
+
+
 if __name__ == "__main__":
-    print(build(sys.argv[1] if len(sys.argv) > 1 else "main"))
+    if len(sys.argv) > 1 and sys.argv[1] == "all":
+        for d in sorted((HERE / "runs").glob("*/log.csv")):
+            build(d.parent.name)
+        print(build_compare())
+    else:
+        print(build(sys.argv[1] if len(sys.argv) > 1 else latest_run()))
