@@ -63,7 +63,9 @@ training\.venv\Scripts\python training\train.py --start --run main --init-from t
                                                                      # trains; resumes runs\main if it exists
 ```
 
-- Pause: create an empty file `training\PAUSE`; delete it to resume. Stop: create `training\STOP` (it saves first).
+- Pause: in File Explorer, right-click in the `training` folder > New > Text Document, name it `PAUSE`
+  (`PAUSE.txt` works too); delete it to resume. Stop: same, named `STOP` (it saves first, then quits;
+  starting again resumes). Ctrl+C doesn't apply: training runs in the background without a window.
 - The GPU temperature is written to the log. Pausing when hot is off by default (Sean's choice; the card
   throttles itself); add `--pause-when-hot` to pause at 82 C and resume at 70 C.
 - No power cap by default (Sean's choice). `gpu-power-cap.ps1` is there if wanted.

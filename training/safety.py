@@ -13,6 +13,21 @@ HERE = Path(__file__).resolve().parent
 PAUSE_FILE = HERE / "PAUSE"
 STOP_FILE = HERE / "STOP"
 
+
+def _exists(f: Path) -> bool:
+    """True for PAUSE or PAUSE.txt: Windows hides extensions, so a "new text document" gets .txt."""
+    return f.exists() or f.with_name(f.name + ".txt").exists()
+
+
+def stop_requested() -> bool:
+    return _exists(STOP_FILE)
+
+
+def clear_stop():
+    for f in (STOP_FILE, STOP_FILE.with_name("STOP.txt")):
+        if f.exists():
+            f.unlink()
+
 HOT_C = 82    # pause above this
 COOL_C = 70   # resume below this
 
@@ -61,9 +76,9 @@ def wait_if_paused(watchdog: Watchdog, log=print) -> bool:
     """Blocks while PAUSE exists or the GPU is hot. Returns False if STOP exists (save and exit)."""
     announced = False
     while True:
-        if STOP_FILE.exists():
+        if stop_requested():
             return False
-        reason = "PAUSE file" if PAUSE_FILE.exists() else ("GPU at %.0f C" % watchdog.last.get("temp", 0) if watchdog.hot.is_set() else None)
+        reason = "PAUSE file" if _exists(PAUSE_FILE) else ("GPU at %.0f C" % watchdog.last.get("temp", 0) if watchdog.hot.is_set() else None)
         if not reason:
             if announced:
                 log("resuming")

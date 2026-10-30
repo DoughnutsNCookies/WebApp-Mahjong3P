@@ -31,7 +31,7 @@ from torch import nn
 
 from mj_env import GameServer
 from model import PolicyValue
-from safety import STOP_FILE, Watchdog, wait_if_paused
+from safety import clear_stop, Watchdog, wait_if_paused
 
 HERE = Path(__file__).resolve().parent
 
@@ -383,8 +383,7 @@ def main(argv=None):
         watchdog.close()
         for s in servers:
             s.close()
-        if STOP_FILE.exists():
-            STOP_FILE.unlink()
+        clear_stop()
 
 
 if __name__ == "__main__":
