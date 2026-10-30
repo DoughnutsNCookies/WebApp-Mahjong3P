@@ -1,4 +1,4 @@
-"""Writes a plain-English progress page for a training run: training/runs/<run>/progress.html.
+﻿"""Writes a plain-English progress page for a training run: training/runs/<run>/progress.html.
 Only reads the run's log files, so it never disturbs a run in progress.
 
     py training/progress.py            (run "main")
@@ -74,10 +74,10 @@ def build(run: str) -> Path:
 
     # Status, in words, with an icon so it isn't colour alone.
     if stop:
-        status, icon, cls = f"Finished: {stop}.", "■", "done"
+        status, icon, cls = f"Finished: {stop}.", "â– ", "done"
     elif not alive:
         saved = re.findall(r"saved .* at update (\d+)", (d / "console.log").read_text(errors="replace") if (d / "console.log").exists() else "")
-        status, icon, cls = ((f"Stopped and saved at update {saved[-1]} (by a STOP file or by hand).", "■", "done") if saved else
+        status, icon, cls = ((f"Stopped and saved at update {saved[-1]} (by a STOP file or by hand).", "â– ", "done") if saved else
                              ("Not running (stopped by a restart, or not started). Its last save is kept.", "!", "warn"))
     else:
         # Judge the trend, not the best point: a single high average can just be a lucky streak (this label
@@ -85,18 +85,18 @@ def build(run: str) -> Path:
         until = (f" It stops by itself if there's no new best by {(best['time'] + timedelta(hours=PATIENCE_H)):%a %H:%M}."
                  if best and best["time"] else "")
         if len(checks) < 12:
-            status, icon, cls = f"Warming up: the trend needs 12 checks ({len(checks)} so far).{until}", "●", "flat"
+            status, icon, cls = f"Warming up: the trend needs 12 checks ({len(checks)} so far).{until}", "â—", "flat"
         else:
             recent = sum(c["rm"] for c in checks[-6:]) / 6
             before = sum(c["rm"] for c in checks[-12:-6]) / 6
             diff = recent - before
             words = f"the last 6 checks average {money(recent)}, against {money(before)} for the 6 before"
             if diff > 0.15:
-                status, icon, cls = f"Improving: {words}.{until}", "▲", "good"
+                status, icon, cls = f"Improving: {words}.{until}", "â–²", "good"
             elif diff < -0.15:
-                status, icon, cls = f"Slipping: {words}.{until}", "▼", "warn"
+                status, icon, cls = f"Slipping: {words}.{until}", "â–¼", "warn"
             else:
-                status, icon, cls = f"Flat: {words} (within the noise).{until}", "●", "flat"
+                status, icon, cls = f"Flat: {words} (within the noise).{until}", "â—", "flat"
     def explain(x):
         if x is None:
             return "No checks yet."
@@ -161,19 +161,19 @@ def build(run: str) -> Path:
     rate = float(last.get("decisions_per_s") or 0)
     disk = sum(f.stat().st_size for f in d.rglob("*") if f.is_file()) / 1e9
     tiles = "".join([
-        tile("Score now", money(current) if current is not None else "–",
+        tile("Score now", money(current) if current is not None else "â€“",
              "Average of the last 3 checks. " + explain(current)),
-        tile("Best so far", money(best["avg"]) if best else "–",
+        tile("Best so far", money(best["avg"]) if best else "â€“",
              (f"At update {best['update']}, {best['time']:%a %H:%M}. Saved as best.pt." if best else "Needs 3 checks.")),
         tile("Running for", hours((now if alive and not stop else datetime.strptime(last['time'], '%Y-%m-%d %H:%M:%S') if last else now) - start),
              f"Started {start:%a %d %b %H:%M}, from {origin}."),
-        tile("Version", f"update {last.get('update', '–')}", "Each update is the AI learning from about 65,000 of its own decisions."),
+        tile("Version", f"update {last.get('update', 'â€“')}", "Each update is the AI learning from about 65,000 of its own decisions."),
     ])
     rows_html = "".join(
-        f"<tr><td>{c['update']}</td><td>{c['time']:%a %H:%M}</td><td>{money(c['rm'])} ± {c['margin']:.2f}</td>"
-        f"<td>{money(c['avg']) if c['avg'] is not None else '–'}</td></tr>" for c in reversed(checks))
+        f"<tr><td>{c['update']}</td><td>{c['time']:%a %H:%M}</td><td>{money(c['rm'])} Â± {c['margin']:.2f}</td>"
+        f"<td>{money(c['avg']) if c['avg'] is not None else 'â€“'}</td></tr>" for c in reversed(checks))
     conf_html = "".join(
-        f"<li>Update {c['update']}: {money(c['rm'])} ± {c['margin']:.2f} over {c['rounds']} rounds "
+        f"<li>Update {c['update']}: {money(c['rm'])} Â± {c['margin']:.2f} over {c['rounds']} rounds "
         f"({'passed: it stopped' if c['rm'] >= TARGET else 'not enough: it carried on'})</li>" for c in confirms) or "<li>None yet. One runs when the average reaches the target.</li>"
 
     if stop:
@@ -222,13 +222,13 @@ dl {{ font-size:.9rem; }} dt {{ font-weight:600; margin-top:8px; }} dd {{ margin
 ul {{ font-size:.9rem; }} .foot {{ color:var(--muted); font-size:.8rem; margin-top:24px; }}
 </style></head><body><div class="viz-root"><main>
 <h1>Mahjong AI training</h1>
-<p class="sub">Run “{html.escape(run)}”. Refreshed {now:%a %d %b, %H:%M}. Double-click <b>Update progress.bat</b> in the training folder to refresh.</p>
+<p class="sub">Run â€œ{html.escape(run)}â€. Refreshed {now:%a %d %b, %H:%M}. Double-click <b>Update progress.bat</b> in the training folder to refresh.</p>
 <div class="status {cls}"><b aria-hidden="true">{icon}</b>{html.escape(status)}</div>
 <div class="tiles">{tiles}</div>
 
 <h2 id="chart-title">Score against two normal bots, over time</h2>
 <div class="legend"><span><span class="sw" style="background:var(--series-1)"></span>Average of the last 3 checks (what the stop rule watches)</span>
-<span><span class="sw dotsw" style="background:var(--muted)"></span>Each check (300 deals; about ±0.35 each, so they jump around)</span></div>
+<span><span class="sw dotsw" style="background:var(--muted)"></span>Each check (300 deals; about Â±0.35 each, so they jump around)</span></div>
 <div class="chart-wrap">{''.join(svg)}<div id="tip" role="status"></div></div>
 <details><summary>Every check as a table</summary><table><thead><tr><th>Update</th><th>When</th><th>Check</th><th>Average of last 3</th></tr></thead><tbody>{rows_html}</tbody></table></details>
 
@@ -238,16 +238,16 @@ ul {{ font-size:.9rem; }} .foot {{ color:var(--muted); font-size:.8rem; margin-t
 <h2>How BEAST is doing</h2>
 <ul>
 <li>Speed: {rate:,.0f} decisions a second (roughly {rate / 45:,.0f} rounds a second).</li>
-<li>GPU: {last.get('gpu_c', '–')} °C, {float(last.get('gpu_w') or 0):.0f} W.</li>
+<li>GPU: {last.get('gpu_c', 'â€“')} Â°C, {float(last.get('gpu_w') or 0):.0f} W.</li>
 <li>Disk used by this run: {disk:.2f} GB.</li>
-<li>Exploring: {last.get('entropy', '–')} (how much it still tries different moves; around 0.6 is healthy, near 0 means it has stopped trying new things).</li>
+<li>Exploring: {last.get('entropy', 'â€“')} (how much it still tries different moves; around 0.6 is healthy, near 0 means it has stopped trying new things).</li>
 </ul>
 
 <h2>What the numbers mean</h2>
 <dl>
 <dt>Score (RM per round)</dt><dd>Money the AI wins per round, on average, at a table with two normal bots, at RM0.20 per fan. +0.30 means about RM30 ahead per 100 rounds. 0 means exactly as good as a normal bot. For scale: the normal bot beats the easy bot by about +0.32.</dd>
 <dt>Fair checks</dt><dd>Every deal is played 3 times, with the AI in each seat, so lucky tiles and the dealer's advantage cancel out. Each check uses fresh deals.</dd>
-<dt>Why the dots jump around</dt><dd>A 300-deal check is only accurate to about ±0.35, so single checks are noisy. The blue line (average of 3) is the one to watch.</dd>
+<dt>Why the dots jump around</dt><dd>A 300-deal check is only accurate to about Â±0.35, so single checks are noisy. The blue line (average of 3) is the one to watch.</dd>
 <dt>Update</dt><dd>One round of learning. Each update, the AI looks back at about 65,000 of its own recent decisions and adjusts.</dd>
 </dl>
 <p class="foot">Reads only training/runs/{html.escape(run)}/log.csv and console.log; it doesn't touch the running training.</p>
@@ -264,7 +264,7 @@ hit.addEventListener('mousemove', (e) => {{
   let best = pts[0]; for (const q of pts) if (Math.abs(q.x - x) < Math.abs(best.x - x)) best = q;
   cross.setAttribute('x1', best.x); cross.setAttribute('x2', best.x);
   tip.style.display = 'block';
-  tip.innerHTML = `Update ${{best.u}} · ${{best.t}}<br>Check: ${{fmt(best.rm)}} ± ${{best.m.toFixed(2)}}` +
+  tip.innerHTML = `Update ${{best.u}} Â· ${{best.t}}<br>Check: ${{fmt(best.rm)}} Â± ${{best.m.toFixed(2)}}` +
     (best.avg === null ? '' : `<br><b>Average of 3: ${{fmt(best.avg)}}</b>`);
   const r = svg.getBoundingClientRect(), w = svg.parentElement.getBoundingClientRect();
   const px = r.left - w.left + best.x / {W} * r.width;
@@ -283,8 +283,8 @@ hit.addEventListener('mouseleave', () => {{ tip.style.display = 'none'; cross.se
 # v1 is a chain: each run started from the one before, so their times add up. (The long run actually
 # started from the trial's best point, about 0.4 h in, so v1's later times are slightly generous.)
 LINES = [
-    {"name": "v2", "runs": ["v2trial", "v2", "v2k"], "cls": "s1",
-     "about": "v2: also sees the analyzer's hand-reading (hints); started from zero; v2k = from 02:47 with kong money"},
+    {"name": "v2", "runs": ["v2trial", "v2", "v2k", "v2n"], "cls": "s1",
+     "about": "v2: also sees the analyzer's hand-reading (hints); started from zero; v2k = from 02:47 with kong money; v2n = overnight from 03:45"},
     {"name": "v1", "runs": ["pilot", "pilot2", "main"], "cls": "s2",
      "about": "v1: raw tiles only; pilot, then the 1-hour trial, then the long run"},
 ]
@@ -393,15 +393,15 @@ def build_compare() -> Path:
         if a is not None and b is not None:
             lead = a - b
             same = (f"After {hours(timedelta(hours=hrs))} of training: v2 {money(a)}, v1 {money(b)} at the same point. "
-                    + ("v2 is ahead" if lead > 0.15 else "v1 is ahead" if lead < -0.15 else "about level") + " (averages of 3 checks, each ±0.2).")
+                    + ("v2 is ahead" if lead > 0.15 else "v1 is ahead" if lead < -0.15 else "about level") + " (averages of 3 checks, each Â±0.2).")
     runs_rows = "".join(
         f"<tr><td><span class='key {s['cls']}'></span>{s['name']}</td><td>{seg['run']}</td>"
         f"<td>{seg['start']:%a %H:%M}</td><td>{hours(timedelta(hours=seg['hours']))}</td><td>{seg['updates']:,}</td>"
         f"<td>{'running' if seg['alive'] else html.escape(seg['stop'] or 'stopped')}</td>"
-        f"<td>{money(sum(p['rm'] for p in seg['pts'][-6:]) / len(seg['pts'][-6:])) if seg['pts'] else '–'}</td></tr>"
+        f"<td>{money(sum(p['rm'] for p in seg['pts'][-6:]) / len(seg['pts'][-6:])) if seg['pts'] else 'â€“'}</td></tr>"
         for s in series for seg in s["segs"])
     paired_rows = "".join(
-        f"<tr><td>{html.escape(p['version'])}</td><td>{html.escape(p['label'])}</td><td><b>{money(p['rm'])}</b> ± {p['margin']:.2f}</td>"
+        f"<tr><td>{html.escape(p['version'])}</td><td>{html.escape(p['label'])}</td><td><b>{money(p['rm'])}</b> Â± {p['margin']:.2f}</td>"
         f"<td>{p['deals']:,} deals (seed {p['seed']})</td><td>{html.escape(p['date'])}</td></tr>" for p in paired)
 
     page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -431,13 +431,13 @@ table {{ border-collapse:collapse; width:100%; font-size:.85rem; font-variant-nu
 ul, dl {{ font-size:.9rem; }} .foot {{ color:var(--muted); font-size:.8rem; margin-top:24px; }}
 </style></head><body><div class="viz-root"><main>
 <h1>Mahjong AI: v1 vs v2</h1>
-<p class="sub">Refreshed {now:%a %d %b, %H:%M}. Double-click <b>Update progress.bat</b> to refresh. Each run's own page: {" · ".join(f'<a href="{seg["run"]}/progress.html">{seg["run"]}</a>' for s in series for seg in s["segs"])}</p>
+<p class="sub">Refreshed {now:%a %d %b, %H:%M}. Double-click <b>Update progress.bat</b> to refresh. Each run's own page: {" Â· ".join(f'<a href="{seg["run"]}/progress.html">{seg["run"]}</a>' for s in series for seg in s["segs"])}</p>
 <p class="lead">{html.escape(same) or "v2 needs a few checks before it can be compared."}</p>
 
 <h2 id="cmp-title">Score against two normal bots, by total training time</h2>
 <div class="legend">{"".join(f'<span><span class="key {s["cls"]}"></span>{html.escape(s["about"])}</span>' for s in series)}</div>
 <div class="chart-wrap">{''.join(svg)}<div id="tip" role="status"></div></div>
-<p class="sub">Lines: average of the last 3 checks. Faint dots: single checks (±0.35 each). Dotted upright lines: one run handing over to the next.
+<p class="sub">Lines: average of the last 3 checks. Faint dots: single checks (Â±0.35 each). Dotted upright lines: one run handing over to the next.
 v1's early checks are less precise (the pilot used 150 deals, and the 1-hour trial reused the same deals each time, which flattered it a little).</p>
 
 <h2>The fair verdict: paired benchmarks</h2>
