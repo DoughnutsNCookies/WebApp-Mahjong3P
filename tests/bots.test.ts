@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { botAction, BotLevel } from '../src/bots';
-import { Action, applyAction, GameState, newRound, waitingFor } from '../src/engine';
+import { AnalyzerInput } from '../src/analyzer';
+import { botAction, BotLevel, decideWin } from '../src/bots';
+import { Action, applyAction, GameState, Meld, newRound, parse, Seat, waitingFor } from '../src/engine';
+import { meld } from './helpers';
 
 function playRound(seed: number, levels: BotLevel[], dealer = 0): { s: GameState; actions: Action[] } {
   let s = newRound(seed, dealer);
@@ -14,7 +16,7 @@ function playRound(seed: number, levels: BotLevel[], dealer = 0): { s: GameState
 describe('bots', () => {
   it('play complete legal rounds at both levels', { timeout: 60000 }, () => {
     for (let seed = 1; seed <= 40; seed++) {
-      const { s } = playRound(seed, seed % 2 ? ['easy', 'normal', 'easy'] : ['normal', 'normal', 'easy'], seed % 3);
+      const { s } = playRound(seed, (['easy', 'normal', 'advanced'] as BotLevel[]).map((_, i, l) => l[(i + seed) % 3]), seed % 3);
       expect(s.result!.total.reduce((a, b) => a + b, 0)).toBe(0);
     }
   });
@@ -66,17 +68,41 @@ describe('bots', () => {
     expect(normal).toBeGreaterThan(0);
   });
 
-  it('normal beats easy over 300 rounds (seats rotate)', { timeout: 120000 }, () => {
-    const money = { normal: 0, easy: 0 };
-    for (let r = 0; r < 300; r++) {
-      // One normal bot against two easy ones; the normal bot moves seat every round.
-      const levels: BotLevel[] = ['easy', 'easy', 'easy'];
-      levels[r % 3] = 'normal';
-      const { s } = playRound(5000 + r, levels, r % 3);
-      s.result!.total.forEach((d, p) => (money[levels[p]] += d));
-    }
-    // Per bot: the normal bot's total against the average easy bot's.
-    expect(money.normal).toBeGreaterThan(money.easy / 2);
-    expect(money.normal).toBeGreaterThan(0);
+  describe('advanced: turning down a win', () => {
+    // 2+2+3+3+3 = 13 tiles, waiting on Rd (3 Dragons, 10 fan) or 5d (Small Dragons, 6 fan).
+    // East just discarded 5d, so 1 5d and 2 Rd are still unseen.
+    const ready = (wall: number, oppMelds: Meld[] = []): AnalyzerInput => ({
+      seat: 1 as Seat,
+      hand: parse('RdRd 55d GdGdGd WdWdWd 123d'),
+      melds: [],
+      bonus: parse('F1'),
+      discardedJokers: 0,
+      ownDiscards: [],
+      opponents: [
+        { player: 0, seat: 0 as Seat, melds: oppMelds, discards: parse('5d'), discardedJokers: 0, bonusCount: 1 },
+        { player: 2, seat: 2 as Seat, melds: oppMelds, discards: [], discardedJokers: 0, bonusCount: 1 },
+      ],
+      wallLeft: wall,
+      bonusSeen: 3,
+    });
+
+    it('holds out early for the 10-fan tile instead of 6 fan now', () => {
+      const d = decideWin(ready(40), 6, false);
+      expect(d.take).toBe(false);
+      expect(d.reason).toMatch(/Carrying on is worth about \d+ sen/);
+    });
+    it('takes the 6 fan at the very end of the round', () => {
+      expect(decideWin(ready(3), 6, false).take).toBe(true);
+    });
+    it('takes the 6 fan when opponents look close to winning', () => {
+      const melds = [meld('pong', 'EEE'), meld('chow', '456d'), meld('pong', 'NNN')];
+      expect(decideWin(ready(40, melds), 6, false).take).toBe(true);
+    });
+    it('always takes 10 fan', () => {
+      expect(decideWin(ready(40), 10, false).take).toBe(true);
+    });
   });
+
+  // Bot strength is measured with the duplicate benchmark (scripts/bots.ts, results in the README), not
+  // here: the edges are a few tenths of a ringgit a round and need ~2000 deals to show reliably.
 });

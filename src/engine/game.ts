@@ -291,6 +291,15 @@ export function legalActions(s: GameState, p: number): Action[] {
   return pend.options[p];
 }
 
+/** The score of the win player p may declare right now, if any (shown to that player only). */
+export function availableWin(s: GameState, p: number): Score | null {
+  if (s.phase === 'turn' && s.turn === p && s.turnDrew) return selfWinScore(s, p);
+  if ((s.phase === 'claim' || s.phase === 'robKong') && s.pending!.options[p].some((a) => a.type === 'win')) {
+    return claimWinScore(s, p, s.pending!.tile, s.pending!.from, s.phase === 'robKong');
+  }
+  return null;
+}
+
 /** Players who still have to act. */
 export function waitingFor(s: GameState): number[] {
   if (s.phase === 'ended') return [];

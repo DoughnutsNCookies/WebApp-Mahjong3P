@@ -32,6 +32,7 @@ export interface AnalyzerInput {
 }
 
 export interface LiveTile { tile: Kind; live: number }
+/** A winning tile. `fanDiscard` is 0 when it can't come off a discard (a joker can only be drawn). */
 export interface Wait { tile: Kind; live: number; fanDiscard: number; fanSelf: number }
 
 export interface FanPlan {
@@ -148,7 +149,13 @@ function ukeireOf(hand13: Kind[], meldCount: number, live: number[]): LiveTile[]
 // it). Keyed on the hand alone so the one-draw lookahead reuses results; live counts are applied after.
 let waitCache = new Map<string, Omit<Wait, 'live'>[]>();
 
-function waitsOf(input: AnalyzerInput, hand13: Kind[], live: number[]): Wait[] {
+/** Start a fresh wait cache (analyze() does this itself; call it before using waitsOf with a new input). */
+export function resetWaitCache() {
+  waitCache = new Map();
+}
+
+/** Every tile that completes a 13-tile hand, with live count and fan on a discard and self-drawn. */
+export function waitsOf(input: AnalyzerInput, hand13: Kind[], live: number[]): Wait[] {
   const key = sortTiles(hand13).join(',');
   let all = waitCache.get(key);
   if (!all) {
@@ -160,10 +167,11 @@ function waitsOf(input: AnalyzerInput, hand13: Kind[], live: number[]): Wait[] {
         seat: input.seat, hand: [...hand13, t], melds: input.melds, bonus: input.bonus,
         discardedJokers: input.discardedJokers, winTile: t,
       };
-      const onDiscard = scoreWin({ ...base, selfDrawn: false });
-      if (!onDiscard) continue;
-      const selfDrawn = scoreWin({ ...base, selfDrawn: true })!;
-      all.push({ tile: t, fanDiscard: onDiscard.fan, fanSelf: selfDrawn.fan });
+      const selfDrawn = scoreWin({ ...base, selfDrawn: true });
+      if (!selfDrawn) continue;
+      // Jokers are never discarded (Q2), so a joker wait can only be self-drawn.
+      const onDiscard = t === JOKER ? null : scoreWin({ ...base, selfDrawn: false });
+      all.push({ tile: t, fanDiscard: onDiscard?.fan ?? 0, fanSelf: selfDrawn.fan });
     }
     waitCache.set(key, all);
   }
@@ -306,7 +314,8 @@ function fanOutlook(input: AnalyzerInput, hand13: Kind[], sh: number, live: numb
 // ---------------------------------------------------------------------------------------------------
 // Defence
 
-function threats(input: AnalyzerInput): Threat[] {
+/** How close each opponent looks to winning, from what is on the table. */
+export function opponentThreats(input: AnalyzerInput): Threat[] {
   const progress = 1 - Math.min(1, input.wallLeft / 40);
   return input.opponents.map((o) => {
     const reasons: string[] = [];
@@ -360,6 +369,12 @@ function safetyOf(input: AnalyzerInput, tile: Kind, live: number[], th: Threat[]
 
 const REACH_VALUE: Record<Reach, number> = { yes: 150, likely: 80, unlikely: -60, no: -250 };
 
+/**
+ * How much each consideration counts when ranking discards (1 = as designed). Tuned by playing bots
+ * against each other in the duplicate format (scripts/bots.ts); scripts may change these for experiments.
+ */
+export const WEIGHTS = { ukeire: 1, fan: 1, defence: 1 };
+
 /** Fan a single tile could still turn into: an honour that scores as a pong is worth holding on to. */
 function keepValue(tile: Kind, seat: Seat): number {
   if (isWind(tile)) return windPongFan(tile, seat);
@@ -371,7 +386,7 @@ export function analyze(input: AnalyzerInput): Analysis {
   waitCache = new Map();
   const meldCount = input.melds.length;
   const live = liveCounts(input);
-  const th = threats(input);
+  const th = opponentThreats(input);
   const maxThreat = Math.max(0, ...th.map((t) => t.level));
   const sh = shanten(input.hand, meldCount);
   const onTurn = input.hand.length + 3 * meldCount === 14;
@@ -394,8 +409,10 @@ export function analyze(input: AnalyzerInput): Analysis {
       const defence = maxThreat * (s >= 2 ? 700 : s === 1 ? 350 : 150);
       const lost = openPlans.filter((p) => p.key !== 'setAsideJokers' && !fan.plans.some((q) => q.key === p.key));
       const lostValue = lost.reduce((a, p) => a + p.fan * (p.status === 'on track' ? 25 : 10), 0);
-      const value = -1000 * s + 8 * ukeireTotal + reachValue + (fan.pathTo10 ? 40 : 0) - defence * safety.risk
-        - lostValue - 6 * keepValue(tile, input.seat);
+      const w = WEIGHTS;
+      const value = -1000 * s + w.ukeire * 8 * ukeireTotal
+        + w.fan * (reachValue + (fan.pathTo10 ? 40 : 0) - lostValue - 6 * keepValue(tile, input.seat))
+        - w.defence * defence * safety.risk;
 
       const reasons: string[] = [];
       reasons.push(s === -1 ? 'Winning hand' : s === 0 ? 'Ready (one tile from winning)' : `${s} away from ready`);
@@ -404,8 +421,13 @@ export function analyze(input: AnalyzerInput): Analysis {
       else if (isWind(tile) && windPongFan(tile, input.seat) === 0) reasons.push(`${name(tile)} scores nothing for you`);
       if (fan.waits) {
         const good = fan.waits.filter((w) => w.fanDiscard >= 5);
+        const drawOnly = fan.waits.filter((w) => w.fanDiscard < 5 && w.fanSelf >= 5);
+        const parts = [
+          ...good.map((w) => `${code(w.tile)} (${w.live} left, ${w.fanDiscard} fan)`),
+          ...drawOnly.map((w) => `${code(w.tile)} (${w.live} left, ${w.fanSelf} fan, self-drawn only)`),
+        ];
         reasons.push(good.length
-          ? `Waits that pay: ${good.map((w) => `${code(w.tile)} (${w.live} left, ${w.fanDiscard} fan)`).join(', ')}`
+          ? `Waits that pay: ${parts.join(', ')}`
           : fan.waits.length ? 'Ready, but no wait reaches 5 fan on a discard' : 'No live winning tiles');
       } else if (fan.goodDraws) {
         reasons.push(`${fan.goodDraws.live} of ${fan.goodDraws.total} improving tiles lead to a 5-fan wait`);

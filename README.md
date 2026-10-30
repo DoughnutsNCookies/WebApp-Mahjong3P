@@ -30,7 +30,9 @@ two bots with hints and a post-hand review.
   pays once ready, whether 5 and 10 fan are realistic), a safety estimate against each opponent, joker
   keep/set-aside advice and loser-settlement fan. Every number comes with a plain-English reason.
 - `src/bots/`: rule-based bots that decide from their own player view only. Easy plays for speed;
-  normal uses the analyzer (fan routes, safety, folding, joker advice, claims only into hands that can pay).
+  normal uses the analyzer (fan routes, safety, folding, joker advice, claims only into hands that can pay);
+  advanced is normal plus money-based play once ready: it can turn down a win under 10 fan when holding
+  out is worth more, using win/lose rates fitted to bot games (`scripts/calibrate.ts`).
 - `tests/`: Vitest tests. Each rule and worked example from the house rules has its own test.
 - `scripts/sim.ts`: plays random rounds in Node and counts what happened.
 
@@ -44,9 +46,24 @@ npm test                       # all tests
 npm run typecheck
 npm run lint
 npx tsx scripts/sim.ts 2000    # random rounds in Node
-npx tsx scripts/bots.ts 1000 normal,easy,easy   # bot vs bot, seats rotate
+npx tsx scripts/bots.ts 500 normal,easy,easy     # bot vs bot, duplicate format
+npx tsx scripts/calibrate.ts                      # refit the advanced bot's win/lose rates
 npx tsx scripts/analyze.ts "12d 456d RdRd Gd 99d E S N J" --bonus "F1"   # analyze a hand
 ```
+
+## Bot benchmark
+
+Duplicate format (`scripts/bots.ts`): every deal is played in all 6 seatings, so tile luck and the dealer's
+edge cancel out. 2,000 deals (12,000 rounds) each, result per round with a 95% margin:
+
+| Matchup | Result |
+|---|---|
+| normal vs two easy | normal +RM0.32 +/- 0.11 |
+| advanced vs two normal | advanced -RM0.01 +/- 0.06 (turned down 52 wins in 12,000 rounds) |
+
+The game is a fast race under these rules: bonus tiles give most hands 5 fan early, about 97% of rounds
+end in a win after roughly 12 discards, and wins are 5-7 fan about three quarters of the time. Holding out
+for more fan is rarely worth it, which is why the advanced bot seldom does.
 
 ## Rules
 

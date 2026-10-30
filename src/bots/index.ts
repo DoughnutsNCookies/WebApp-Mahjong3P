@@ -4,23 +4,33 @@
 //           keeps every joker, never folds.
 //   normal: the full analyzer. Weighs fan routes (5-fan minimum, path to 10) and safety, folds against
 //           a close opponent, follows the joker advice, and won't claim into a hand that can't pay.
+//   advanced: normal, plus money-based play once ready (see advanced.ts): may turn down a win under
+//           10 fan when holding out is worth more, and picks its wait by expected payout.
 
 import { analyze, AnalyzerInput, DiscardOption, inputFromView, liveCounts, shanten } from '../analyzer';
 import { Action, GameState, JOKER, Kind, Meld, playerView, Slot } from '../engine';
+import { bestReadyDiscard, decideWin } from './advanced';
 
-export type BotLevel = 'easy' | 'normal';
+export type BotLevel = 'easy' | 'normal' | 'advanced';
+export * from './advanced';
 
 export function botAction(s: GameState, player: number, level: BotLevel): Action {
   const view = playerView(s, player);
   const legal = view.legal;
   if (!legal.length) throw new Error(`Player ${player} has nothing to do`);
-
-  // Always take a win: every legal win already meets the 5-fan minimum, and a discard win pays ~3/4 of a
-  // self-drawn one while waiting risks dealing in.
-  const win = legal.find((a) => a.type === 'win' || a.type === 'selfWin' || a.type === 'openingSlam');
-  if (win) return win;
-
   const input = inputFromView(view);
+
+  // Easy and normal always take a win: every legal win already meets the 5-fan minimum, and a discard
+  // win pays 3/4 of a self-drawn one while waiting risks dealing in. Advanced weighs it up.
+  const win = legal.find((a) => a.type === 'win' || a.type === 'selfWin' || a.type === 'openingSlam');
+  if (win) {
+    if (level !== 'advanced' || win.type === 'openingSlam' || !view.winScore) return win;
+    const d = decideWin(input, view.winScore.fan, win.type === 'selfWin');
+    if (d.take) return win;
+    if (win.type === 'selfWin') return { type: 'discard', player, tile: d.discard! };
+    return legal.find((a) => a.type === 'pass')!;
+  }
+
   if (view.phase === 'turn') return turnAction(input, legal, level);
   if (view.phase === 'claim') return claimAction(input, legal, view.claimTile!, level);
   return legal.find((a) => a.type === 'pass')!;
@@ -50,7 +60,7 @@ function fastest(input: AnalyzerInput): { tile: Kind; shanten: number; live: num
 function turnAction(input: AnalyzerInput, legal: Action[], level: BotLevel): Action {
   const player = legal[0].player;
   const best = level === 'easy' ? fastest(input) : null;
-  const analysis = level === 'normal' ? analyze(input) : null;
+  const analysis = level !== 'easy' ? analyze(input) : null;
   const bestShanten = best ? best.shanten : analysis!.options[0].shanten;
 
   // Kongs: take one when it costs nothing (the replacement draw is free).
@@ -69,7 +79,10 @@ function turnAction(input: AnalyzerInput, legal: Action[], level: BotLevel): Act
     return { type: 'discardJoker', player };
   }
 
-  const tile = best ? best.tile : analysis!.options[0].tile;
+  let tile = best ? best.tile : analysis!.options[0].tile;
+  if (level === 'advanced' && analysis!.options[0].shanten === 0) {
+    tile = bestReadyDiscard(input, analysis!)?.tile ?? tile;
+  }
   return { type: 'discard', player, tile };
 }
 

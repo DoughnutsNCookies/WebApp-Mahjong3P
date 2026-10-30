@@ -1,8 +1,8 @@
 // What one player is allowed to see. A multiplayer server sends only this, never the GameState.
 
-import { Action, GameState, legalActions, Phase, PlayerState, RoundResult, seatOf, wallLeft } from './game';
+import { Action, availableWin, GameState, legalActions, Phase, PlayerState, RoundResult, seatOf, wallLeft } from './game';
 import { Seat } from './rules';
-import { Meld } from './scoring';
+import { Meld, Score } from './scoring';
 import { Kind } from './tiles';
 
 export interface OpponentView {
@@ -28,6 +28,8 @@ export interface PlayerView {
   /** The tile currently open to claims, if any. */
   claimTile: Kind | null;
   legal: Action[];
+  /** The win you could declare right now and what it scores, if any. */
+  winScore: Score | null;
   /** At the end of the round every hand is shown (Q11). */
   revealedHands: Kind[][] | null;
   result: RoundResult | null;
@@ -55,6 +57,7 @@ export function playerView(s: GameState, me: number): PlayerView {
     })),
     claimTile: s.phase === 'claim' || s.phase === 'robKong' ? s.pending!.tile : null,
     legal: legalActions(s, me),
+    winScore: availableWin(s, me),
     revealedHands: ended ? s.players.map((pl) => pl.hand) : null,
     result: s.result,
   });
