@@ -53,6 +53,7 @@ def main():
     ap.add_argument("--deals", type=int, default=300)
     ap.add_argument("--bots", default="normal", choices=["easy", "normal", "advanced"])
     ap.add_argument("--json", type=Path, help="also write the result here (used by train.py)")
+    ap.add_argument("--seed", type=int, default=7, help="which deals to play (same seed, same deals)")
     args = ap.parse_args()
 
     if args.random:
@@ -66,7 +67,7 @@ def main():
         model.eval()
         policy = model_policy(model, device)
 
-    r = evaluate(policy, args.deals, args.bots)
+    r = evaluate(policy, args.deals, args.bots, seed=args.seed)
     print(f"{r['rounds']} rounds vs two {args.bots} bots: {r['rm_per_round']:+.2f} RM/round +/- {r['margin']:.2f}")
     if args.json:
         args.json.write_text(json.dumps(r))

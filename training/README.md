@@ -45,6 +45,15 @@ of a quarter of the rounds, benchmarks in a separate process, and saving every 2
 snapshot every 200 (the pilot wrote 1.9 GB in 47 minutes). The imitation head start was dropped: learning
 from scratch reaches the normal bot in about half an hour.
 
+## One-hour trial of the fixes (2026-10-30, run `pilot2`, started from the pilot)
+
+About 80k decisions/s while training; exploration settled at ~0.6 instead of collapsing. Large benchmarks
+(3,000 rounds): best version +0.29 +/- 0.20 RM/round vs normal bots, final version +0.19 +/- 0.19, and
++0.42 +/- 0.23 vs easy bots (pilot: +0.08 and +0.06). Fixed afterwards: every 300-deal check had reused the
+same deals, which flattered the saved "best" version (checks averaged +0.34); each check now plays fresh
+deals. Reaching the +0.50 target now needs a separate 1,000-deal confirming benchmark on its own deals. The
+learning rate tapers to 20% over the time limit.
+
 ## Running (not yet)
 
 ```

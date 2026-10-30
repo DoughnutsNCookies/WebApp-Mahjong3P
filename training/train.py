@@ -61,6 +61,11 @@ def parse(argv=None):
     ap.add_argument("--keep-every", type=int, default=200, help="updates between kept snapshots")
     ap.add_argument("--torch-threads", type=int, default=4)
     ap.add_argument("--pause-when-hot", action="store_true", help="pause above 82 C (off by default)")
+    # Stop rule (agreed with Sean): judged on the average of the last 3 benchmarks.
+    ap.add_argument("--max-hours", type=float, default=168, help="stop after this long whatever happens (7 days)")
+    ap.add_argument("--patience-hours", type=float, default=12, help="stop if the 3-benchmark average hasn't set a new best for this long")
+    ap.add_argument("--target", type=float, default=0.50, help="stop once a confirming benchmark reaches this many RM/round")
+    ap.add_argument("--confirm-deals", type=int, default=1000, help="deals in the confirming benchmark (one 300-deal result is +/- 0.35)")
     return ap.parse_args(argv)
 
 
@@ -159,16 +164,21 @@ class Benchmarks:
         self.run_dir, self.deals, self.bots = run_dir, deals, bots
         self.proc = None
         self.update = None
+        self.kind = "regular"
 
-    def start(self, model, update: int, sizes: dict) -> bool:
+    def start(self, model, update: int, sizes: dict, deals: int | None = None, kind: str = "regular") -> bool:
         if self.proc and self.proc.poll() is None:
             return False  # the previous benchmark is still running; skip this one
+        self.kind = kind
         path = self.run_dir / "bench.pt"
         torch.save({"model": model.state_dict(), **sizes}, path)
         self.update = update
         self.proc = subprocess.Popen(
-            [sys.executable, str(HERE / "evaluate.py"), "--checkpoint", str(path), "--deals", str(self.deals),
-             "--bots", self.bots, "--json", str(self.run_dir / "bench.json")],
+            [sys.executable, str(HERE / "evaluate.py"), "--checkpoint", str(path), "--deals", str(deals or self.deals),
+             "--bots", self.bots, "--json", str(self.run_dir / "bench.json"),
+             # Fresh deals for every regular benchmark (the pilot reused one set, which flattered the
+             # "best" version); the confirming benchmark uses its own set, never used for picking.
+             "--seed", str(424242 if kind == "confirm" else 1000 + update)],
             cwd=HERE.parent, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
         return True
@@ -178,7 +188,7 @@ class Benchmarks:
             return None
         self.proc = None
         try:
-            return self.update, json.loads((self.run_dir / "bench.json").read_text())
+            return self.update, self.kind, json.loads((self.run_dir / "bench.json").read_text())
         except (OSError, ValueError):
             return None
 
@@ -194,7 +204,8 @@ def main(argv=None):
             f"  {args.servers} game servers x {args.envs} rounds at once, {args.steps} decisions per update\n"
             f"  older versions in 1-2 seats of {args.league_prob:.0%} of rounds (pool of {args.pool_size}, a snapshot every {args.pool_every} updates)\n"
             f"  benchmark vs two {args.eval_bots} bots every {args.eval_every} updates ({args.eval_deals} deals x 3 seats), in parallel\n"
-            f"  latest.pt every {args.save_every} updates, kept snapshot every {args.keep_every}; PAUSE / STOP files in {HERE}")
+            f"  latest.pt every {args.save_every} updates, kept snapshot every {args.keep_every}; PAUSE / STOP files in {HERE}\n"
+            f"  stops at +{args.target:.2f} RM/round (3-benchmark average), after {args.patience_hours:g} h without a new best, or after {args.max_hours:g} h")
     if not args.start and not args.dry_run:
         print(plan + "\n\nNot training: add --start to begin (or --dry-run SECONDS to measure speed).")
         return
@@ -244,6 +255,9 @@ def main(argv=None):
     watchdog = Watchdog(pause_when_hot=args.pause_when_hot)
     t0 = t_last = time.time()
     decisions = decisions_total = 0
+    recent: list[float] = []
+    best_avg, best_at = -1e9, time.time()
+    stop_reason = None
     try:
         while True:
             if dry and time.time() - t0 >= args.dry_run:
@@ -307,6 +321,9 @@ def main(argv=None):
 
             if dry or rollouts.ready() < args.steps:
                 continue
+            frac = min(1.0, (time.time() - t0) / (args.max_hours * 3600))
+            for g in opt.param_groups:
+                g["lr"] = args.lr * (1 - 0.8 * frac)
             stats = ppo_update(model, opt, rollouts.take(device), args)
             update += 1
             rate = decisions / (time.time() - t_last)
@@ -320,9 +337,28 @@ def main(argv=None):
             bench_cols = ["", "", ""]
             finished = bench.poll()
             if finished:
-                bu, r = finished
+                bu, kind, r = finished
                 bench_cols = [bu, f"{r['rm_per_round']:.3f}", f"{r['margin']:.3f}"]
-                print(f"update {bu}: vs {args.eval_bots} bots {r['rm_per_round']:+.2f} RM/round +/- {r['margin']:.2f}", flush=True)
+                label = f"confirming benchmark ({r['rounds']} rounds)" if kind == "confirm" else f"vs {args.eval_bots} bots"
+                print(f"update {bu}: {label} {r['rm_per_round']:+.2f} RM/round +/- {r['margin']:.2f}", flush=True)
+                if kind == "confirm":
+                    if r["rm_per_round"] >= args.target:
+                        stop_reason = f"reached the target: confirmed {r['rm_per_round']:+.2f} RM/round over {r['rounds']} rounds"
+                    else:
+                        print("  not confirmed; carrying on", flush=True)
+                else:
+                    recent = (recent + [r["rm_per_round"]])[-3:]
+                    if len(recent) == 3:
+                        avg = sum(recent) / 3
+                        if avg > best_avg:
+                            best_avg, best_at = avg, time.time()
+                            save(run_dir / "best.pt")
+                        if avg >= args.target and bench.start(model, update, sizes, deals=args.confirm_deals, kind="confirm"):
+                            print(f"  3-benchmark average {avg:+.2f}: confirming with {args.confirm_deals} deals", flush=True)
+            if not stop_reason and best_avg > -1e9 and time.time() - best_at > args.patience_hours * 3600:
+                stop_reason = f"no new best for {args.patience_hours:g} h (best 3-benchmark average {best_avg:+.2f} RM/round)"
+            if not stop_reason and time.time() - t0 > args.max_hours * 3600:
+                stop_reason = f"time limit of {args.max_hours:g} h"
             writer.writerow([time.strftime("%Y-%m-%d %H:%M:%S"), update, f"{rate:.0f}", f"{stats['policy']:.4f}",
                              f"{stats['value']:.4f}", f"{stats['entropy']:.3f}", watchdog.last.get("temp", ""),
                              watchdog.last.get("power", ""), *bench_cols])
@@ -331,6 +367,9 @@ def main(argv=None):
                 save(latest)
             if update % args.keep_every == 0:
                 save(run_dir / f"update-{update:05d}.pt")
+            if stop_reason:
+                print(f"stopping: {stop_reason}", flush=True)
+                break
     finally:
         elapsed = time.time() - t0
         if dry:
