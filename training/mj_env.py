@@ -31,9 +31,11 @@ class GameServer:
     """
 
     def __init__(self, envs: int = 64, seats=("ai", "ai", "ai"), seed: int = 1, eval_deals: int | None = None,
-                 hints: bool = True):
+                 hints: bool = True, stats_file: str | None = None):
         # hints: v2 models also see the analyzer's hand-reading; v1 models (369 numbers) need hints=False.
         config = {"envs": envs, "seats": list(seats), "seed": seed, "hints": hints}
+        if stats_file:
+            config["statsFile"] = stats_file  # per-round details for measurements
         if eval_deals:
             config["evalDeals"] = eval_deals
         self.proc = subprocess.Popen(

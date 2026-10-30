@@ -16,6 +16,7 @@
 // A frame with nDecisions = 0 and no running games means evaluation is finished.
 // Rewards are each player's money for the round in units of a 10-fan hand value (V at 10 fan).
 
+import { appendFileSync } from 'node:fs';
 import { botAction, BotLevel } from '../bots';
 import {
   applyActionInPlace, DEFAULT_RULES, GameState, handValue, makeRng, newRound, playerView, PlayerView, waitingFor,
@@ -23,7 +24,7 @@ import {
 import { ACTIONS, encodeHints, encodePrivileged, encodeView, HINTS, OBS as VIEW, PRIV, slotActions } from './encode';
 
 type Seat = 'ai' | BotLevel;
-interface Config { envs: number; seats: Seat[]; seed: number; evalDeals?: number; hints?: boolean }
+interface Config { envs: number; seats: Seat[]; seed: number; evalDeals?: number; hints?: boolean; statsFile?: string }
 
 const cfg: Config = { envs: 64, seats: ['ai', 'ai', 'ai'], seed: 1, hints: true, ...JSON.parse(process.argv[2] ?? '{}') };
 // v2 models also see the analyzer's hints; v1 models (369 numbers) are served with hints: false.
@@ -74,6 +75,12 @@ function advance(env: Env) {
     const g = env.game;
     if (g.phase === 'ended') {
       const t = g.result!.total;
+      // Optional per-round details for measurements (off unless statsFile is given; training never sets it).
+      if (cfg.statsFile) {
+        const r = g.result!;
+        appendFileSync(cfg.statsFile, JSON.stringify({ deal: env.deal, aiSeat: env.aiSeat, type: r.type, winner: r.winner ?? null,
+          payer: r.payer ?? null, payment: r.payment ?? null, fan: r.score?.fan ?? null, total: r.total }) + '\n');
+      }
       done.push(env.id, env.deal, env.aiSeat, t[0] / scale, t[1] / scale, t[2] / scale);
       if (!startRound(env)) return;
       continue;
