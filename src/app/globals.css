@@ -106,6 +106,11 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
 .opp header, .me header { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; font-size: 0.9rem; }
 .opp header .money, .me header .money { margin-left: auto; }
 .seat { color: var(--muted); font-size: 0.8rem; }
+.fan-chip-wrap { display: contents; }
+.fan-chip { border: 1px solid var(--line); background: var(--tile); border-radius: 999px; padding: 2px 9px; min-height: 28px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+.fan-chip.five { border-color: var(--green); color: var(--green); }
+.fan-pop { display: block; flex-basis: 100%; order: 10; font-size: 0.8rem; color: var(--muted); font-weight: 400; margin-top: 2px; }
+.opp header, .me header { position: relative; }
 .opp-hand { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; margin-bottom: 4px; }
 .opp-hand .side { font-size: 0.75rem; margin-left: auto; }
 .melds, .bonus-row, .river { display: flex; flex-wrap: wrap; gap: 2px; margin: 4px 0; }

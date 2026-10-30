@@ -4,7 +4,8 @@
 // and hand at the bottom. Used for live play and, read-only, for replays.
 
 import { ReactNode } from 'react';
-import { JOKER, Kind, Meld, PlayerView, SEAT_NAMES } from '../engine';
+import { JOKER, Kind, loserFan, Meld, PlayerView, SEAT_NAMES } from '../engine';
+import { FanChip } from './FanChip';
 import { Tile, TileBack } from './Tile';
 import { rmShort } from './format';
 
@@ -65,11 +66,13 @@ export function Table({ view, names, tally, revealed, active, lastDiscard, hand 
 
   const opponent = (p: number, side: string) => {
     const o = view.players[p];
+    const f = loserFan(o.seat, revealed ? revealed[p] : [], o.melds, o.bonus, o.discardedJokers);
     return (
       <section className={`opp${active === p ? ' active' : ''}`} aria-label={`${names[p]}, on your ${side}`}>
         <header>
           <strong>{names[p]}</strong>
           <span className="seat">{SEAT_NAMES[o.seat]}{p === view.dealer ? ' · dealer' : ''}</span>
+          <FanChip fan={f.fan} items={f.items} hiddenNote={!revealed} />
           {tally && <span className={`money ${tally[p] < 0 ? 'neg' : ''}`}>{rmShort(tally[p])}</span>}
         </header>
         <div className="opp-hand">
@@ -83,6 +86,8 @@ export function Table({ view, names, tally, revealed, active, lastDiscard, hand 
     );
   };
 
+  const mine = loserFan(view.seat, view.hand, view.self.melds, view.self.bonus, view.self.discardedJokers);
+
   return (
     <div className="table">
       <div className="opponents">
@@ -93,6 +98,7 @@ export function Table({ view, names, tally, revealed, active, lastDiscard, hand 
         <header>
           <strong>{names[me]}</strong>
           <span className="seat">{SEAT_NAMES[view.seat]}{me === view.dealer ? ' · dealer' : ''}</span>
+          <FanChip fan={mine.fan} items={mine.items} />
           {tally && <span className={`money ${tally[me] < 0 ? 'neg' : ''}`}>{rmShort(tally[me])}</span>}
         </header>
         <River tiles={view.self.discards} highlight={lastDiscard?.player === me ? lastDiscard.index : undefined} />
