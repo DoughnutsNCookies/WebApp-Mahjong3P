@@ -144,26 +144,30 @@ function ukeireOf(hand13: Kind[], meldCount: number, live: number[]): LiveTile[]
 // ---------------------------------------------------------------------------------------------------
 // Fan
 
-const waitMemo = new Map<string, Wait[]>();
+// Winning tiles per concealed hand, for one analyze() call (seat, melds and bonus tiles are fixed within
+// it). Keyed on the hand alone so the one-draw lookahead reuses results; live counts are applied after.
+let waitCache = new Map<string, Omit<Wait, 'live'>[]>();
 
 function waitsOf(input: AnalyzerInput, hand13: Kind[], live: number[]): Wait[] {
-  const key = input.seat + '|' + sortTiles(hand13).join(',') + '|' + input.melds.length + '|' + live.join(',');
-  const hit = waitMemo.get(key);
-  if (hit) return hit;
-  const out: Wait[] = [];
-  for (const t of kindsToTry) {
-    if (live[t] === 0) continue;
-    const base = {
-      seat: input.seat, hand: [...hand13, t], melds: input.melds, bonus: input.bonus,
-      discardedJokers: input.discardedJokers, winTile: t,
-    };
-    const onDiscard = scoreWin({ ...base, selfDrawn: false });
-    if (!onDiscard) continue;
-    const selfDrawn = scoreWin({ ...base, selfDrawn: true })!;
-    out.push({ tile: t, live: live[t], fanDiscard: onDiscard.fan, fanSelf: selfDrawn.fan });
+  const key = sortTiles(hand13).join(',');
+  let all = waitCache.get(key);
+  if (!all) {
+    all = [];
+    for (const t of kindsToTry) {
+      // Cheap shanten check first; full scoring only for tiles that actually complete the hand.
+      if (shanten([...hand13, t], input.melds.length).best !== -1) continue;
+      const base = {
+        seat: input.seat, hand: [...hand13, t], melds: input.melds, bonus: input.bonus,
+        discardedJokers: input.discardedJokers, winTile: t,
+      };
+      const onDiscard = scoreWin({ ...base, selfDrawn: false });
+      if (!onDiscard) continue;
+      const selfDrawn = scoreWin({ ...base, selfDrawn: true })!;
+      all.push({ tile: t, fanDiscard: onDiscard.fan, fanSelf: selfDrawn.fan });
+    }
+    waitCache.set(key, all);
   }
-  waitMemo.set(key, out);
-  return out;
+  return all.filter((w) => live[w.tile] > 0).map((w) => ({ ...w, live: live[w.tile] }));
 }
 
 /** Chance of getting through the rest of the round without drawing a bonus tile (for Flowerless). */
@@ -364,6 +368,7 @@ function keepValue(tile: Kind, seat: Seat): number {
 }
 
 export function analyze(input: AnalyzerInput): Analysis {
+  waitCache = new Map();
   const meldCount = input.melds.length;
   const live = liveCounts(input);
   const th = threats(input);

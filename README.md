@@ -10,8 +10,8 @@ two bots with hints and a post-hand review.
 |---|---|
 | 1. Rules engine with tests | Done |
 | 2. Hand analyzer (shanten, live tiles, reachable fan, safety) | Done |
-| 3. Rule-based bots (easy / normal) | Next |
-| 4. Playable game in the browser | |
+| 3. Rule-based bots (easy / normal) | Done |
+| 4. Playable game in the browser | Next |
 | 5. Self-play training (optional) | |
 
 ## Layout
@@ -29,6 +29,8 @@ two bots with hints and a post-hand review.
   live tiles that improve the hand, the fan outlook (finished fan, open fan routes, every wait and what it
   pays once ready, whether 5 and 10 fan are realistic), a safety estimate against each opponent, joker
   keep/set-aside advice and loser-settlement fan. Every number comes with a plain-English reason.
+- `src/bots/`: rule-based bots that decide from their own player view only. Easy plays for speed;
+  normal uses the analyzer (fan routes, safety, folding, joker advice, claims only into hands that can pay).
 - `tests/`: Vitest tests. Each rule and worked example from the house rules has its own test.
 - `scripts/sim.ts`: plays random rounds in Node and counts what happened.
 
@@ -42,6 +44,7 @@ npm test                       # all tests
 npm run typecheck
 npm run lint
 npx tsx scripts/sim.ts 2000    # random rounds in Node
+npx tsx scripts/bots.ts 1000 normal,easy,easy   # bot vs bot, seats rotate
 npx tsx scripts/analyze.ts "12d 456d RdRd Gd 99d E S N J" --bonus "F1"   # analyze a hand
 ```
 

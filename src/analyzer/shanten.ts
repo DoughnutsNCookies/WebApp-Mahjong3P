@@ -4,7 +4,7 @@
 // Jokers are wild, so each joker fills one missing tile. The 4-copies limit on jokers is ignored here
 // (it matters only in rare hands); the engine's scorer enforces it on actual wins.
 
-import { isDot, JOKER, Kind, PLAYABLE } from '../engine';
+import { JOKER, Kind, PLAYABLE } from '../engine';
 
 export interface Shanten {
   standard: number;
@@ -15,47 +15,81 @@ export interface Shanten {
   best: number;
 }
 
-const memo = new Map<string, number>();
+/** [complete sets, two-tile partial sets, has a pair for the pair slot] */
+type Combo = [number, number, number];
+
+const dotMemo = new Map<number, Combo[]>();
+
+/**
+ * Every useful way to group the dots (only 9 kinds, so this is small and cached by dots pattern).
+ * Dominated combos (no better in any count) are dropped.
+ */
+function dotCombos(c: number[]): Combo[] {
+  let key = 0;
+  for (let i = 0; i < 9; i++) key = key * 5 + c[i];
+  const hit = dotMemo.get(key);
+  if (hit) return hit;
+
+  // Many groupings give the same counts; keep each distinct (f, p, pair) once.
+  const seen = new Set<number>();
+  const d = c.slice(0, 9);
+  const rec = (i: number, f: number, p: number, pair: number) => {
+    while (i < 9 && d[i] === 0) i++;
+    if (i === 9) return void seen.add(f * 100 + p * 10 + pair);
+    if (d[i] >= 3) { d[i] -= 3; rec(i, f + 1, p, pair); d[i] += 3; }
+    if (i <= 6 && d[i + 1] && d[i + 2]) { d[i]--; d[i + 1]--; d[i + 2]--; rec(i, f + 1, p, pair); d[i]++; d[i + 1]++; d[i + 2]++; }
+    if (d[i] >= 2) {
+      d[i] -= 2;
+      if (!pair) rec(i, f, p, 1);
+      rec(i, f, p + 1, pair);
+      d[i] += 2;
+    }
+    if (i <= 7 && d[i + 1]) { d[i]--; d[i + 1]--; rec(i, f, p + 1, pair); d[i]++; d[i + 1]++; }
+    if (i <= 6 && d[i + 2]) { d[i]--; d[i + 2]--; rec(i, f, p + 1, pair); d[i]++; d[i + 2]++; }
+    d[i]--; rec(i, f, p, pair); d[i]++; // leave one as a single
+  };
+  rec(0, 0, 0, 0);
+  const found: Combo[] = [...seen].map((v) => [Math.floor(v / 100), Math.floor(v / 10) % 10, v % 10]);
+  const pareto = found.filter((a) => !found.some((b) =>
+    b !== a && b[0] >= a[0] && b[1] >= a[1] && b[2] >= a[2]));
+  dotMemo.set(key, pareto);
+  return pareto;
+}
 
 /** Fewest tiles missing to complete `sets` sets plus a pair, using real tiles only. */
 function minMissing(c: number[], sets: number): number {
-  const key = c.join('') + '/' + sets;
-  const hit = memo.get(key);
-  if (hit !== undefined) return hit;
+  const real = c.reduce((a, b) => a + b, 0);
+  // Honours can't chow, so each kind is simply a set (3+), a pair (2) or a single.
+  let triples = 0;
+  let pairs = 0;
+  for (let k = 9; k < PLAYABLE; k++) {
+    if (c[k] >= 3) triples++;
+    else if (c[k] === 2) pairs++;
+  }
+  // Where the pair-slot pair comes from among the honours: none, an honour pair, or a broken honour pong.
+  const honourChoices: Combo[] = [[triples, pairs, 0]];
+  if (pairs) honourChoices.push([triples, pairs - 1, 1]);
+  if (triples) honourChoices.push([triples - 1, pairs, 1]);
 
   let best = 3 * sets + 2;
-  // full: complete sets; part: two-tile partial sets; pair: has a pair for the pair slot; singles: lone tiles.
-  const rec = (i: number, full: number, part: number, pair: boolean, singles: number) => {
-    while (i < PLAYABLE && c[i] === 0) i++;
-    if (i === PLAYABLE) {
-      let missing = part;
-      let s = singles;
+  for (const [df, dp, dpair] of dotCombos(c)) {
+    for (const [hf, hp, hpair] of honourChoices) {
+      let f = df + hf;
+      let p = dp + hp + (dpair && hpair ? 1 : 0); // a second pair can still be a partial set
+      const pair = dpair || hpair ? 1 : 0;
+      f = Math.min(f, sets);
+      p = Math.min(p, sets - f);
+      let singles = real - 3 * f - 2 * p - 2 * pair;
+      let missing = p;
       if (!pair) {
-        if (s > 0) { s--; missing += 1; } else missing += 2;
+        if (singles > 0) { singles--; missing += 1; } else missing += 2;
       }
-      const open = sets - full - part;
-      const fromSingles = Math.min(open, s);
+      const open = sets - f - p;
+      const fromSingles = Math.min(open, Math.max(0, singles));
       missing += fromSingles * 2 + (open - fromSingles) * 3;
       if (missing < best) best = missing;
-      return;
     }
-    const groups = full + part;
-    if (groups < sets) {
-      if (c[i] >= 3) { c[i] -= 3; rec(i, full + 1, part, pair, singles); c[i] += 3; }
-      if (isDot(i) && i <= 6 && c[i + 1] && c[i + 2]) {
-        c[i]--; c[i + 1]--; c[i + 2]--; rec(i, full + 1, part, pair, singles); c[i]++; c[i + 1]++; c[i + 2]++;
-      }
-    }
-    if (!pair && c[i] >= 2) { c[i] -= 2; rec(i, full, part, true, singles); c[i] += 2; }
-    if (groups < sets) {
-      if (c[i] >= 2) { c[i] -= 2; rec(i, full, part + 1, pair, singles); c[i] += 2; }
-      if (isDot(i) && i <= 7 && c[i + 1]) { c[i]--; c[i + 1]--; rec(i, full, part + 1, pair, singles); c[i]++; c[i + 1]++; }
-      if (isDot(i) && i <= 6 && c[i + 2]) { c[i]--; c[i + 2]--; rec(i, full, part + 1, pair, singles); c[i]++; c[i + 2]++; }
-    }
-    c[i]--; rec(i, full, part, pair, singles + 1); c[i]++;
-  };
-  rec(0, 0, 0, false, 0);
-  memo.set(key, best);
+  }
   return best;
 }
 
