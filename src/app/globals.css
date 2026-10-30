@@ -13,9 +13,10 @@
   --dots: #24477a;
   --joker: #b4561b;
   --gap: 4px;
-  /* Hand tiles: two rows of 7 on a phone, one row of 14 on wide screens. The width leaves room for the
-     page and panel padding (24 + 18px) and the gap before the drawn tile (8px). */
-  --hand-w: min(52px, calc((min(100vw, 900px) - 50px - 6 * var(--gap)) / 7));
+  /* Your hand is always one row of up to 14 tiles plus the gap before the drawn tile, so the width is
+     the screen minus page and panel padding (about 40px), 13 gaps, and ~0.4 of a tile for that gap. */
+  --hand-gap: 2px;
+  --hand-w: min(54px, calc((min(100vw, 900px) - 40px - 13 * var(--hand-gap)) / 14.4));
   --small-w: 26px;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
   color: var(--ink);
@@ -23,7 +24,7 @@
 }
 
 @media (min-width: 760px) {
-  :root { --hand-w: min(54px, calc((min(100vw, 900px) - 60px - 14 * var(--gap)) / 14.4)); --small-w: 30px; }
+  :root { --hand-gap: 4px; --small-w: 30px; }
 }
 
 * { box-sizing: border-box; }
@@ -46,6 +47,7 @@ main { flex: 1; }
 .tab { border: 1px solid transparent; background: none; padding: 8px 10px; min-height: 40px; border-radius: 6px; cursor: pointer; }
 .tab.on { border-color: var(--line); background: var(--panel); font-weight: 600; }
 .topbar .money { margin-left: 4px; white-space: nowrap; }
+@media (max-width: 359px) { .topbar h1 { display: none; } .topbar .tab:first-of-type { margin-left: auto; } }
 @media (max-width: 420px) {
   .topbar { gap: 2px; }
   .topbar h1 { font-size: 0.95rem; }
@@ -68,8 +70,10 @@ main { flex: 1; }
 .tile.small .main { font-size: calc(var(--small-w) * 0.55); }
 .tile.small .sub { display: none; }
 .tile.hand { width: var(--hand-w); height: calc(var(--hand-w) * 1.36); cursor: pointer; }
-.tile.hand .main { font-size: calc(var(--hand-w) * 0.52); }
+.tile.hand .main { font-size: calc(var(--hand-w) * 0.58); }
 .tile.hand .sub { font-size: 10px; margin-top: 3px; color: var(--muted); }
+/* Labels under the characters only where the tiles are big enough to hold them. */
+@media (max-width: 759px) { .tile.hand .sub { display: none; } }
 .tile .main { font-weight: 600; }
 .tile.dots .main { color: var(--dots); font-variant-numeric: lining-nums tabular-nums; }
 .tile.red .main { color: var(--red); }
@@ -79,7 +83,7 @@ main { flex: 1; }
 .tile.bonus .main { color: #7a4b8c; }
 /* Flower/season number in the corner, readable even on small tiles. */
 .tile .num { position: absolute; top: 1px; right: 2px; font-size: 9px; font-weight: 700; color: #7a4b8c; line-height: 1; }
-.tile.hand .num { font-size: 12px; top: 3px; right: 4px; }
+.tile.hand .num { font-size: max(9px, calc(var(--hand-w) * 0.26)); top: 2px; right: 3px; }
 .legend { margin: 12px 0; font-size: 0.92rem; }
 .legend summary { cursor: pointer; min-height: 36px; display: flex; align-items: center; color: var(--muted); }
 .legend table { border-collapse: collapse; margin: 6px 0; }
@@ -109,8 +113,9 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
 .meld.concealed .tile { background: #ece6d8; }
 .river { min-height: calc(var(--small-w) * 1.32); }
 .river .muted { font-size: 0.8rem; }
-.hand { display: flex; flex-wrap: wrap; gap: var(--gap); margin-top: 10px; padding-top: 10px; align-items: flex-end; }
-.hand .drawn { margin-left: 8px; }
+.hand-row { display: flex; flex-wrap: nowrap; gap: var(--hand-gap); margin-top: 10px; padding-top: 10px; align-items: flex-end; }
+.hand-row .drawn { margin-left: calc(var(--hand-w) * 0.35); }
+@media (max-width: 759px) { .me { padding: 8px 6px; } }
 
 /* Controls below the table */
 .controls { margin-top: 8px; }

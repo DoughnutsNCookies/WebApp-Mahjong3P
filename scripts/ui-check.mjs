@@ -73,7 +73,7 @@ for (const run of runs) {
       if (await win.count()) { await win.first().click(); moves++; continue; }
       const hintBtn = page.getByRole('button', { name: 'Hint', exact: true });
       if (await hintBtn.isVisible()) await hintBtn.click();
-      const best = page.locator('.hand .tile.mark-best').first();
+      const best = page.locator('.hand-row .tile.mark-best').first();
       await best.waitFor({ timeout: 5000 }).catch(() => {});
       if (!hintShot) { await shot('2-hint'); hintShot = true; }
       if (await best.count()) {

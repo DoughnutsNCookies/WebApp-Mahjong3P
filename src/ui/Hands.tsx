@@ -59,7 +59,7 @@ export function Replay({ log, start = 0, onClose }: { log: SavedRound; start?: n
         revealed={revealAll || s.phase === 'ended' ? s.players.map((p) => p.hand) : null}
         active={s.phase === 'turn' ? s.turn : undefined}
         lastDiscard={lastDiscardOf(s)}
-        hand={<div className="hand">{view.hand.map((k, i) => <Tile key={i} kind={k} size="hand" />)}</div>}
+        hand={<div className="hand-row">{view.hand.map((k, i) => <Tile key={i} kind={k} size="hand" />)}</div>}
       />
     </div>
   );

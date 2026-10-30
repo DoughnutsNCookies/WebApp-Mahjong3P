@@ -48,7 +48,7 @@ function HandRow({ hand, drawn, selected, best, onTap }: {
     />
   );
   return (
-    <div className="hand" aria-label="Your hand">
+    <div className="hand-row" aria-label="Your hand">
       {tiles.map((k, i) => render(k, `h${i}`))}
       {drawnTile !== null && <span className="drawn">{render(drawnTile, 'drawn')}</span>}
     </div>
