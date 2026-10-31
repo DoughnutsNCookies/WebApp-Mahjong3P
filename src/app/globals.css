@@ -336,7 +336,7 @@ html[data-theme="macau"] .topbar { background: var(--paper); }
 html[data-theme="macau"] .topbar .money { color: #f3d27a; }
 html[data-theme="macau"] .topbar .money.neg { color: #ffb4a8; }
 html[data-theme="macau"] .opp, html[data-theme="macau"] .me { border-color: var(--gold); }
-html[data-theme="macau"] .tile { background: linear-gradient(var(--tile), #ece0c0); box-shadow: 0 2px 0 #8a6a25; }
+html[data-theme="macau"] .tile { background: linear-gradient(var(--tile), #ece0c0); --tile-edge: 0 2px 0 #8a6a25; box-shadow: var(--tile-edge); }
 html[data-theme="macau"] .tile.back { background: var(--tile-back); }
 html[data-theme="macau"] .tile.win { background: var(--tile-gold); }
 html[data-theme="macau"] .tile.last { background: var(--tile-wash); }
@@ -427,7 +427,11 @@ html[data-effects="full"] .seal { animation-delay: 1.5s; }
   .btn.cta:not(:disabled) { animation: cta 1.8s ease-out infinite; }
   .btn.win.cta { animation: cta-win 1.2s ease-out infinite; }
 }
-@keyframes nudge { 0%, 20%, 100% { translate: 0 0; } 9% { translate: 0 -5px; } }
+/* Each tile lifts and lights up gold as the wave passes (keeping the Macau tile's bottom edge). */
+@keyframes nudge {
+  0%, 24%, 100% { translate: 0 0; box-shadow: var(--tile-edge, 0 0 #0000); }
+  10% { translate: 0 -5px; box-shadow: var(--tile-edge, 0 0 #0000), 0 0 0 2px #f0c24f, 0 0 16px #f3d27acc; background: var(--tile-gold); }
+}
 @keyframes picked { 0%, 100% { outline: 2px solid transparent; outline-offset: 2px; } 50% { outline: 2px solid var(--green); outline-offset: 4px; } }
 @keyframes cta {
   0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--green-strong) 60%, transparent); }
