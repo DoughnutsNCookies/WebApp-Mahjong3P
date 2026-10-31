@@ -6,13 +6,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { aiAction, loadWebModel, WebModel } from '../ai/web';
 import { botAction } from '../bots';
+import { latestHappening } from './feed';
 import { Action, applyAction, DEFAULT_RULES, GameState, newRound, replay, Rules, waitingFor } from '../engine';
 import {
   addLog, loadCurrent, loadMatch, loadSettings, MatchState, NEW_MATCH, randomSeed, saveCurrent,
   saveMatch, saveSettings, Settings,
 } from './storage';
 
-const DELAY = { slow: 1100, normal: 650, fast: 250 };
+// Time between bot moves: long enough to see each discard land and read the caption.
+const DELAY = { slow: 1800, normal: 1150, fast: 550 };
+// Extra time after a bot claims a set or draws a bonus tile, so its call-out reads before it discards.
+const HOLD = 0.6;
 
 export const rulesFor = (unitSen: number): Rules => ({ ...DEFAULT_RULES, unitSen });
 
@@ -69,7 +73,9 @@ export function useMatch() {
     if (level === 'ai' && aiStatus === 'loading') return; // runs again once the weights arrive
     const move = (g: GameState) =>
       level !== 'ai' ? botAction(g, bot, level) : ai.model ? aiAction(g, bot, ai.model) : botAction(g, bot, 'normal');
-    const delay = game.phase === 'turn' ? DELAY[settings.speed] : DELAY[settings.speed] / 3;
+    const h = latestHappening(game);
+    const justCalled = game.phase === 'turn' && h?.player === bot && h.what !== 'discard';
+    const delay = game.phase === 'turn' ? DELAY[settings.speed] * (justCalled ? 1 + HOLD : 1) : DELAY[settings.speed] / 3;
     const t = setTimeout(() => {
       setGame((g) => (g && g.phase !== 'ended' ? applyAction(g, move(g)) : g));
     }, delay);

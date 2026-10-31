@@ -11,6 +11,7 @@ import { deleteLog, exportLogs, loadLogs, SavedRound } from './storage';
 import { Table } from './Table';
 import { Tile } from './Tile';
 import { rulesFor } from './useMatch';
+import { latestHappening, winningTile } from './feed';
 import { lastDiscardOf } from './Game';
 
 const namesFor = (log: SavedRound) => ['You', `Bot 1 · ${levelName(log.levels[0])}`, `Bot 2 · ${levelName(log.levels[1])}`];
@@ -60,7 +61,9 @@ export function Replay({ log, start = 0, onClose }: { log: SavedRound; start?: n
         revealed={revealAll || s.phase === 'ended' ? s.players.map((p) => p.hand) : null}
         active={s.phase === 'turn' ? s.turn : undefined}
         winner={s.result?.winner}
+        winTile={winningTile(s)}
         lastDiscard={lastDiscardOf(s)}
+        fresh={latestHappening(s)}
         hand={<div className="hand-row">{view.hand.map((k, i) => <Tile key={i} kind={k} size="hand" />)}</div>}
       />
     </div>

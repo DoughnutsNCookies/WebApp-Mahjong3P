@@ -77,13 +77,15 @@ interface Props {
   /** A joker standing in a meld for this kind. */
   joker?: boolean;
   dim?: boolean;
+  /** Table moments: the newest discard, a tile just placed (set or bonus), the tile a round was won on. */
+  fx?: 'last' | 'arrive' | 'win';
   onClick?: () => void;
   title?: string;
 }
 
-export function Tile({ kind, size = 'small', selected, marked, joker, dim, onClick, title }: Props) {
+export function Tile({ kind, size = 'small', selected, marked, joker, dim, fx, onClick, title }: Props) {
   const f = face(kind);
-  const cls = ['tile', size, f.cls, selected && 'selected', marked && `mark-${marked}`, joker && 'as-joker', dim && 'dim']
+  const cls = ['tile', size, f.cls, selected && 'selected', marked && `mark-${marked}`, joker && 'as-joker', dim && 'dim', fx]
     .filter(Boolean).join(' ');
   const content = (
     <>

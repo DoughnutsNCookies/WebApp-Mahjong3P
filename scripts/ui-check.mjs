@@ -92,10 +92,10 @@ for (const run of runs) {
       moves++;
       // Once, part-way through, refresh and check the round resumes where it was.
       if (!refreshed && moves === 3) {
-        const wallBefore = await page.locator('.status-line .muted').first().textContent();
+        const wallBefore = await page.locator('.status-line .wall').textContent();
         await page.reload();
         await page.getByRole('navigation', { name: 'Main' }).waitFor();
-        const wallAfter = await page.locator('.status-line .muted').first().textContent();
+        const wallAfter = await page.locator('.status-line .wall').textContent();
         if (wallBefore !== wallAfter) fail(`refresh lost the round (${wallBefore} -> ${wallAfter})`);
         refreshed = true;
       }

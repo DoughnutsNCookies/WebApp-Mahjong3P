@@ -13,6 +13,9 @@
   --dots: #24477a;
   --joker: #b4561b;
   --gap: 4px;
+  --gold: #b8892b;
+  --gold-wash: #fbf1d6;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   /* Your hand is always one row of up to 14 tiles plus the gap before the drawn tile, so the width is
      the screen minus page and panel padding (about 40px), 13 gaps, and ~0.4 of a tile for that gap. */
   --hand-gap: 2px;
@@ -69,7 +72,7 @@ main { flex: 1; }
 .tile.small { width: var(--small-w); height: calc(var(--small-w) * 1.32); }
 .tile.small .main { font-size: calc(var(--small-w) * 0.55); }
 .tile.small .sub { display: none; }
-.tile.hand { width: var(--hand-w); height: calc(var(--hand-w) * 1.36); cursor: pointer; }
+.tile.hand { width: var(--hand-w); height: calc(var(--hand-w) * 1.36); cursor: pointer; transition: transform 140ms var(--ease-out); }
 .tile.hand .main { font-size: calc(var(--hand-w) * 0.58); }
 .tile.hand .sub { font-size: 10px; margin-top: 3px; color: var(--muted); }
 /* Labels under the characters only where the tiles are big enough to hold them. */
@@ -108,11 +111,10 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
 /* Table */
 .table { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
 .opponents { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.opp, .me { border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: var(--panel); min-width: 0; }
+.opp, .me { position: relative; border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: var(--panel); min-width: 0; transition: border-color 200ms, background-color 450ms; }
 .opp.active, .me.active { border-color: var(--green); }
 /* The round's winner: a gold box. */
-.opp.winner, .me.winner { border: 2px solid #b8892b; background: #fbf1d6; }
-.win-badge { background: #b8892b; color: #fff; font-weight: 700; font-size: 0.75rem; border-radius: 999px; padding: 2px 8px; }
+.opp.winner, .me.winner { border-color: var(--gold); outline: 1px solid var(--gold); background: var(--gold-wash); }
 .opp header, .me header { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; font-size: 0.9rem; }
 .opp header .money, .me header .money { margin-left: auto; }
 .seat { color: var(--muted); font-size: 0.8rem; }
@@ -133,7 +135,12 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
 
 /* Controls below the table */
 .controls { margin-top: 8px; }
-.status-line { display: flex; justify-content: space-between; gap: 8px; align-items: center; font-size: 0.92rem; min-height: 28px; }
+.status-line { display: flex; justify-content: space-between; gap: 8px; align-items: center; font-size: 0.92rem; min-height: 40px; }
+.status-line .wall { white-space: nowrap; }
+/* During play the caption stays on screen, pinned to the bottom edge, so a phone never scrolls past it. */
+.status-line.pinned { margin-top: 8px; position: sticky; bottom: 0; z-index: 2; background: var(--paper); border-top: 1px solid var(--line); padding: 6px 0 calc(6px + env(safe-area-inset-bottom)); }
+.caption { margin: 0; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; min-width: 0; }
+.instruction { margin: 2px 0 0; font-size: 0.92rem; font-weight: 600; }
 .prompt { border: 1px solid var(--green); border-radius: 8px; padding: 10px; margin: 8px 0; background: var(--panel); }
 .prompt p { margin: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
@@ -161,6 +168,7 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
 .fan-items li.total { font-weight: 700; border-bottom: 0; }
 .money-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; font-variant-numeric: tabular-nums; }
 .money-table th, .money-table td { border-bottom: 1px solid var(--line); padding: 5px 4px; text-align: right; }
+.money-table td { white-space: nowrap; }
 .money-table th:first-child { text-align: left; font-weight: 400; color: var(--muted); }
 .money-table thead th { font-weight: 600; color: var(--ink); }
 .money-table tr.total td, .money-table tr.total th { font-weight: 700; color: var(--ink); border-bottom: 0; }
@@ -191,3 +199,74 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
 .settings input, .settings select { min-height: 44px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--tile); max-width: 420px; }
 .settings .field p { margin: 0; }
 .foot { font-size: 0.78rem; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 20px; }
+
+/* Motion: what just happened at the table. One idea throughout: tiles land on the table, and calls
+   are stamped onto the player who made them. Everything is visible without the animation. */
+
+/* The newest discard drops onto its row and keeps an orange edge until the next one. */
+.tile.last { outline: 2px solid var(--joker); outline-offset: 1px; background: #fbeee2; animation: land 420ms var(--ease-out); }
+@keyframes land {
+  from { transform: translateY(-18px) scale(1.35); opacity: 0; }
+  45% { opacity: 1; }
+  to { transform: none; }
+}
+/* A set just claimed or declared, or a bonus tile just drawn. */
+.arrive, .tile.arrive { animation: arrive 380ms var(--ease-out); }
+@keyframes arrive { from { transform: scale(1.3); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Call-outs ("Pong!", "Flower"): stamped onto the top edge of the box, then lifted away. */
+.callout {
+  position: absolute; top: -13px; left: 50%; z-index: 3; pointer-events: none; white-space: nowrap;
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; font-weight: 700; font-size: 0.95rem;
+  padding: 1px 10px; border: 1px solid currentColor; border-radius: 4px; background: var(--paper);
+  transform: translateX(-50%); animation: call 1600ms var(--ease-out) forwards;
+}
+.callout.tone-set { color: var(--green); }
+.callout.tone-bonus { color: #7a4b8c; }
+.callout.tone-fei { color: var(--joker); }
+@keyframes call {
+  0% { opacity: 0; transform: translateX(-50%) scale(1.7); }
+  14% { opacity: 1; transform: translateX(-50%) scale(1); }
+  78% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+}
+
+/* Hu! A red seal (chop) stamped next to the winner's name. */
+.seal {
+  display: inline-grid; place-items: center; width: 30px; height: 30px; flex: none; align-self: center;
+  background: var(--red); color: #fdf3e3; border: 2px solid #fdf3e3; outline: 2px solid var(--red);
+  border-radius: 3px; font: 700 19px/1 "Songti SC", "SimSun", "Noto Serif CJK SC", serif;
+  transform: rotate(-8deg); animation: seal 560ms var(--ease-out) both;
+}
+@keyframes seal {
+  0% { opacity: 0; transform: rotate(-8deg) scale(2.6); }
+  55% { opacity: 1; transform: rotate(-8deg) scale(0.92); }
+  100% { opacity: 1; transform: rotate(-8deg) scale(1); }
+}
+/* The tile the round was won on: set apart in the winner's hand, gold-edged, lifted once the seal lands. */
+.win-gap { display: inline-flex; margin-left: 8px; }
+.tile.win { outline: 2px solid var(--gold); outline-offset: 1px; background: var(--gold-wash); animation: lift 480ms var(--ease-out) 300ms both; }
+@keyframes lift { from { transform: none; } to { transform: translateY(-5px); } }
+
+/* A bot deciding. */
+.thinking { display: inline-flex; gap: 3px; align-self: center; }
+.thinking i { width: 5px; height: 5px; border-radius: 50%; background: var(--green); animation: think 1s ease-in-out infinite; }
+.thinking i:nth-child(2) { animation-delay: 0.15s; }
+.thinking i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes think { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+
+/* The caption, your claim prompt and the result arrive; a new caption replaces the old one. */
+.caption { animation: settle 240ms var(--ease-out); }
+.prompt { animation: settle 240ms var(--ease-out); }
+.panel.result { animation: rise 380ms var(--ease-out); }
+@keyframes settle { from { opacity: 0; transform: translateY(4px); } }
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+
+/* Reduced motion: no movement or scaling. Highlights, the seal, the gold tile and fades all stay. */
+@media (prefers-reduced-motion: reduce) {
+  .tile.last, .arrive, .tile.arrive, .seal, .caption, .prompt, .panel.result { animation: none; }
+  .tile.win { animation: none; transform: none; }
+  .tile.hand { transition: none; }
+  .callout { animation: call-fade 1600ms linear forwards; }
+}
+@keyframes call-fade { 0% { opacity: 0; } 10%, 80% { opacity: 1; } 100% { opacity: 0; } }

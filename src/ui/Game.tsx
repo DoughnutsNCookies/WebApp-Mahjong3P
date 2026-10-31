@@ -2,11 +2,12 @@
 
 // Live play: the table, your hand, your actions, claims, the hint and the end-of-round result.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { analyze, claimAdvice, inputFromView } from '../analyzer';
 import { Action, GameState, JOKER, Kind, playerView, waitingFor } from '../engine';
 import { actionLabel } from './format';
 import { BonusLegend } from './BonusLegend';
+import { Caption, latestHappening, useCallouts, winningTile } from './feed';
 import { ClaimHint, HintPanel } from './Hint';
 import { ResultPanel } from './Result';
 import { Table } from './Table';
@@ -23,18 +24,20 @@ export function lastDiscardOf(g: GameState): { player: number; index: number } |
   return null;
 }
 
-/** Your hand, with the drawn tile set slightly apart. */
-function HandRow({ hand, drawn, selected, best, onTap }: {
+/** Your hand, with the drawn tile (or the tile you won on) set slightly apart. */
+function HandRow({ hand, drawn, won, selected, best, onTap }: {
   hand: Kind[];
   drawn: Kind | null;
+  won?: Kind | null;
   selected: Kind | null;
   best: Kind | null;
   onTap?: (k: Kind) => void;
 }) {
   const tiles = hand.slice();
   let drawnTile: Kind | null = null;
-  if (drawn !== null) {
-    const i = tiles.lastIndexOf(drawn);
+  const apart = won ?? drawn;
+  if (apart !== null) {
+    const i = tiles.lastIndexOf(apart);
     if (i >= 0) [drawnTile] = tiles.splice(i, 1);
   }
   const render = (k: Kind, key: string) => (
@@ -44,6 +47,7 @@ function HandRow({ hand, drawn, selected, best, onTap }: {
       size="hand"
       selected={selected === k}
       marked={best === k ? 'best' : undefined}
+      fx={key === 'drawn' && won != null ? 'win' : undefined}
       onClick={onTap ? () => onTap(k) : undefined}
     />
   );
@@ -67,6 +71,19 @@ export function Game({ game, names, levels, tally, onAct, onNext, onReview }: {
   const [selected, setSelected] = useState<Kind | null>(null);
   const [hintOpen, setHintOpen] = useState(false);
   const view = useMemo(() => playerView(game, 0), [game]);
+  const happening = useMemo(() => latestHappening(game), [game]);
+  const winTile = useMemo(() => winningTile(game), [game]);
+  const callouts = useCallouts(game);
+  // "Bot 1 · normal" is just "Bot 1" in the caption, so it fits on a phone line.
+  const shortNames = useMemo(() => names.map((n) => n.split(' · ')[0]), [names]);
+
+  // When a round ends, let the seal and the winning tile land before the result panel opens.
+  const [resultFor, setResultFor] = useState<number | null>(null);
+  useEffect(() => {
+    if (game.phase !== 'ended') return;
+    const t = setTimeout(() => setResultFor(game.seed), game.result?.winner === 0 || game.result?.type === 'draw' ? 450 : 1300);
+    return () => clearTimeout(t);
+  }, [game]);
 
   const myTurn = view.phase === 'turn' && view.turn === 0;
   const prompt = view.phase !== 'turn' && view.phase !== 'ended' && view.legal.length > 0;
@@ -95,8 +112,7 @@ export function Game({ game, names, levels, tally, onAct, onNext, onReview }: {
   const waiting = waitingFor(game).filter((p) => p !== 0);
   const status = view.phase === 'ended' ? null
     : myTurn ? (game.turnDrew ? 'Your turn: tap a tile, tap again to discard.' : 'Your turn: discard a tile.')
-      : prompt ? null
-        : `${names[waiting[0] ?? view.turn]} is thinking…`;
+      : null;
 
   const turnButtons = myTurn ? view.legal.filter((a) => a.type !== 'discard') : [];
   const winFan = view.winScore?.fan;
@@ -110,11 +126,16 @@ export function Game({ game, names, levels, tally, onAct, onNext, onReview }: {
         revealed={view.revealedHands}
         active={view.phase === 'turn' ? view.turn : undefined}
         winner={game.result?.winner}
+        winTile={winTile}
         lastDiscard={lastDiscardOf(game)}
+        fresh={happening}
+        callouts={callouts}
+        thinking={view.phase === 'ended' ? [] : waiting}
         hand={
           <HandRow
             hand={view.hand}
             drawn={myTurn && game.turnDrew ? game.lastDrawn : null}
+            won={game.result?.winner === 0 ? winTile : null}
             selected={selected}
             best={analysis?.options[0]?.tile ?? null}
             onTap={myTurn ? tap : undefined}
@@ -122,11 +143,14 @@ export function Game({ game, names, levels, tally, onAct, onNext, onReview }: {
         }
       />
 
+      {/* Outside .controls so it can stay pinned to the bottom of the screen over the whole table. */}
+      <div className="status-line pinned">
+        <p className="caption" key={happening?.at ?? -1} aria-live="polite"><Caption h={happening} names={shortNames} /></p>
+        <span className="muted wall">Wall: {view.wallLeft}</span>
+      </div>
+
       <div className="controls">
-        <div className="status-line">
-          <span>{status}</span>
-          <span className="muted">Wall: {view.wallLeft}</span>
-        </div>
+        {status && <p className="instruction">{status}</p>}
 
         {prompt && (
           <div className="prompt" role="group" aria-label="Your choice">
@@ -178,7 +202,7 @@ export function Game({ game, names, levels, tally, onAct, onNext, onReview }: {
 
         <BonusLegend seat={view.seat} />
 
-        {view.phase === 'ended' && game.result && (
+        {view.phase === 'ended' && game.result && resultFor === game.seed && (
           <ResultPanel
             result={game.result} names={names} onReview={onReview} onNext={onNext}
             report={{ seed: game.seed, dealer: game.dealer, actions: game.actions, rules: game.rules, levels, date: new Date().toISOString() }}
