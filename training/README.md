@@ -54,7 +54,20 @@ same deals, which flattered the saved "best" version (checks averaged +0.34); ea
 deals. Reaching the +0.50 target now needs a separate 1,000-deal confirming benchmark on its own deals. The
 learning rate tapers to 20% over the time limit.
 
-## Running (not yet)
+## Checks on fixed practice deals (2026-10-31)
+
+Every regular check now plays the same 1,000 practice deals (`--eval-seed`, default 4242), and a new version
+becomes `best.pt` only if it beats the best so far deal by deal on them. `best.pt` is now the exact weights
+that were measured (it used to be saved a few updates later). Confirming uses its own fixed deals
+(`--confirm-seed`), and results reported in the journal use a third set (seed 777) that nothing is ever picked
+on, so picking on the practice deals can't flatter the reported numbers.
+
+The same version on the same deals gives the identical result every time, but two versions agree only
+weakly on the same deal (correlation about 0.4; one different discard changes every draw after it), so
+pairing alone narrows a comparison by about a quarter. 1,000 deals instead of 300 brings a version-vs-version
+comparison from about +/- 0.48 to about +/- 0.20 RM/round.
+
+## Running
 
 ```
 training\.venv\Scripts\python training\train.py                     # shows the plan, trains nothing

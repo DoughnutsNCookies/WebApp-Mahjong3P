@@ -64,7 +64,14 @@ def parse(argv=None):
     ap.add_argument("--pool-every", type=int, default=50, help="updates between snapshots added to the opponent pool")
     ap.add_argument("--pool-size", type=int, default=8)
     ap.add_argument("--eval-every", type=int, default=100, help="updates between benchmarks (run in parallel)")
-    ap.add_argument("--eval-deals", type=int, default=300)
+    # 1,000 deals: on the same deals two versions agree only weakly (correlation ~0.4; one different discard
+    # changes every draw after it), so pairing alone narrows the margin by only ~25%. 300 deals left a
+    # version-vs-version margin of +/- 0.37; 1,000 brings it to about +/- 0.20.
+    ap.add_argument("--eval-deals", type=int, default=1000)
+    # The same practice deals at every check, so versions are compared on identical tiles (paired), and a
+    # separate fixed set for confirming. Neither is the 1,000-deal test set (seed 777) reported in the journal.
+    ap.add_argument("--eval-seed", type=int, default=4242, help="deals for the regular checks (the same every time)")
+    ap.add_argument("--confirm-seed", type=int, default=6060, help="deals for the confirming benchmark")
     ap.add_argument("--eval-bots", default="normal", choices=["easy", "normal", "advanced"])
     ap.add_argument("--save-every", type=int, default=25, help="updates between saves of latest.pt")
     ap.add_argument("--keep-every", type=int, default=500, help="updates between kept snapshots (v2: ~50 min apart)")
@@ -72,7 +79,7 @@ def parse(argv=None):
     ap.add_argument("--pause-when-hot", action="store_true", help="pause above 82 C (off by default)")
     # Stop rule (agreed with Sean): judged on the average of the last 3 benchmarks.
     ap.add_argument("--max-hours", type=float, default=168, help="stop after this long whatever happens (7 days)")
-    ap.add_argument("--patience-hours", type=float, default=12, help="stop if the 3-benchmark average hasn't set a new best for this long")
+    ap.add_argument("--patience-hours", type=float, default=12, help="stop if no check has beaten the best version for this long")
     ap.add_argument("--target", type=float, default=0.50, help="stop once a confirming benchmark reaches this many RM/round")
     ap.add_argument("--confirm-deals", type=int, default=1000, help="deals in the confirming benchmark (one 300-deal result is +/- 0.35)")
     return ap.parse_args(argv)
@@ -174,8 +181,8 @@ def ppo_update(model, opt, data, args):
 class Benchmarks:
     """Runs evaluate.py on a snapshot in its own process, one at a time, and hands back finished results."""
 
-    def __init__(self, run_dir: Path, deals: int, bots: str):
-        self.run_dir, self.deals, self.bots = run_dir, deals, bots
+    def __init__(self, run_dir: Path, deals: int, bots: str, seed: int, confirm_seed: int):
+        self.run_dir, self.deals, self.bots, self.seed, self.confirm_seed = run_dir, deals, bots, seed, confirm_seed
         self.proc = None
         self.update = None
         self.kind = "regular"
@@ -190,9 +197,9 @@ class Benchmarks:
         self.proc = subprocess.Popen(
             [sys.executable, str(HERE / "evaluate.py"), "--checkpoint", str(path), "--deals", str(deals or self.deals),
              "--bots", self.bots, "--json", str(self.run_dir / "bench.json"),
-             # Fresh deals for every regular benchmark (the pilot reused one set, which flattered the
-             # "best" version); confirming benchmarks use their own fresh sets, never used for picking.
-             "--seed", str(500000 + update if kind == "confirm" else 1000 + update)],
+             # The same deals every time: results differ only because the play did, and the best version
+             # is picked by a deal-by-deal comparison. The test set the journal reports is kept separate.
+             "--seed", str(self.confirm_seed if kind == "confirm" else self.seed)],
             cwd=HERE.parent, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
         return True
@@ -202,7 +209,10 @@ class Benchmarks:
             return None
         self.proc = None
         try:
-            return self.update, self.kind, json.loads((self.run_dir / "bench.json").read_text())
+            r = json.loads((self.run_dir / "bench.json").read_text())
+            # Keep the exact weights that were measured (training has moved on since).
+            torch.save(torch.load(self.run_dir / "bench.pt", map_location="cpu"), self.run_dir / "bench-done.pt")
+            return self.update, self.kind, r
         except (OSError, ValueError):
             return None
 
@@ -217,9 +227,9 @@ def main(argv=None):
     plan = (f"Self-play PPO, run '{args.run}' in {run_dir}\n"
             f"  {args.servers} self-play servers x {args.envs} rounds, plus {args.bot_servers} x {args.bot_envs} rounds against {args.bot_level} bots; {args.steps} decisions per update\n"
             f"  older versions in 1-2 seats of {args.league_prob:.0%} of rounds (pool of {args.pool_size}, a snapshot every {args.pool_every} updates)\n"
-            f"  benchmark vs two {args.eval_bots} bots every {args.eval_every} updates ({args.eval_deals} deals x 3 seats), in parallel\n"
+            f"  benchmark vs two {args.eval_bots} bots every {args.eval_every} updates ({args.eval_deals} deals x 3 seats, the same deals each time), in parallel\n"
             f"  latest.pt every {args.save_every} updates, kept snapshot every {args.keep_every}; PAUSE / STOP files in {HERE}\n"
-            f"  stops at +{args.target:.2f} RM/round (3-benchmark average), after {args.patience_hours:g} h without a new best, or after {args.max_hours:g} h")
+            f"  stops at +{args.target:.2f} RM/round (confirmed), after {args.patience_hours:g} h without beating the best version, or after {args.max_hours:g} h")
     if not args.start and not args.dry_run:
         print(plan + "\n\nNot training: add --start to begin (or --dry-run SECONDS to measure speed).")
         return
@@ -296,7 +306,7 @@ def main(argv=None):
         if new_log:
             writer.writerow(["time", "update", "decisions_per_s", "policy_loss", "value_loss", "entropy",
                              "gpu_c", "gpu_w", "benchmark_update", "vs_bots_rm", "margin"])
-    bench = Benchmarks(run_dir, args.eval_deals, args.eval_bots)
+    bench = Benchmarks(run_dir, args.eval_deals, args.eval_bots, args.eval_seed, args.confirm_seed)
 
     pool: list[PolicyValue] = []                          # older versions (only their player part is used)
     frozen: dict[tuple[int, int], tuple[set, int]] = {}   # (server, env) -> (seats played by the pool, pool index)
@@ -304,8 +314,10 @@ def main(argv=None):
     watchdog = Watchdog(pause_when_hot=args.pause_when_hot)
     t0 = t_last = time.time()
     decisions = decisions_total = bot_decisions = 0
-    recent: list[float] = []
-    best_avg, best_at = -1e9, time.time()
+    # The best version so far: its result on each practice deal (kept across restarts).
+    best_file = run_dir / "best-deals.json"
+    best = json.loads(best_file.read_text()) if not dry and best_file.exists() else None
+    best_at = time.time()
     stop_reason = None
     try:
         while True:
@@ -411,10 +423,11 @@ def main(argv=None):
 
             if update % args.pool_every == 0:
                 pool = (pool + [copy.deepcopy(model).eval()])[-args.pool_size:]
-            if update % args.eval_every == 0:
-                bench.start(model, update, sizes)
+            # Collect a finished benchmark before starting the next (which overwrites its snapshot).
             bench_cols = ["", "", ""]
             finished = bench.poll()
+            if update % args.eval_every == 0:
+                bench.start(model, update, sizes)
             if finished:
                 bu, kind, r = finished
                 bench_cols = [bu, f"{r['rm_per_round']:.3f}", f"{r['margin']:.3f}"]
@@ -426,16 +439,25 @@ def main(argv=None):
                     else:
                         print("  not confirmed; carrying on", flush=True)
                 else:
-                    recent = (recent + [r["rm_per_round"]])[-3:]
-                    if len(recent) == 3:
-                        avg = sum(recent) / 3
-                        if avg > best_avg:
-                            best_avg, best_at = avg, time.time()
-                            save(run_dir / "best.pt")
-                        if avg >= args.target and bench.start(model, update, sizes, deals=args.confirm_deals, kind="confirm"):
-                            print(f"  3-benchmark average {avg:+.2f}: confirming with {args.confirm_deals} deals", flush=True)
-            if not stop_reason and best_avg > -1e9 and time.time() - best_at > args.patience_hours * 3600:
-                stop_reason = f"no new best for {args.patience_hours:g} h (best 3-benchmark average {best_avg:+.2f} RM/round)"
+                    # Same deals as the best version, so compare deal by deal: the luck of the tiles cancels.
+                    new = np.array(r["per_deal"])
+                    if best is None or len(best["per_deal"]) != len(new):
+                        gain, margin = None, None
+                    else:
+                        d = new - np.array(best["per_deal"])
+                        gain, margin = float(d.mean()), float(2 * d.std(ddof=1) / np.sqrt(len(d)))
+                    if gain is None or gain > 0:
+                        print(f"  new best version" + (f": {gain:+.2f} +/- {margin:.2f} RM/round better than update {best['update']} on the same deals" if gain is not None else ""), flush=True)
+                        best = {"update": bu, "rm": r["rm_per_round"], "per_deal": r["per_deal"]}
+                        best_file.write_text(json.dumps(best))
+                        torch.save(torch.load(run_dir / "bench-done.pt", map_location="cpu") | {"update": bu}, run_dir / "best.pt")
+                        best_at = time.time()
+                    else:
+                        print(f"  {gain:+.2f} +/- {margin:.2f} RM/round compared with the best (update {best['update']}) on the same deals", flush=True)
+                    if r["rm_per_round"] >= args.target and bench.start(model, update, sizes, deals=args.confirm_deals, kind="confirm"):
+                        print(f"  {r['rm_per_round']:+.2f} on the practice deals: confirming with {args.confirm_deals} other deals", flush=True)
+            if not stop_reason and best is not None and time.time() - best_at > args.patience_hours * 3600:
+                stop_reason = f"no check beat the best version (update {best['update']}, {best['rm']:+.2f} RM/round on the practice deals) for {args.patience_hours:g} h"
             if not stop_reason and time.time() - t0 > args.max_hours * 3600:
                 stop_reason = f"time limit of {args.max_hours:g} h"
             writer.writerow([time.strftime("%Y-%m-%d %H:%M:%S"), update, f"{rate:.0f}", f"{stats['policy']:.4f}",

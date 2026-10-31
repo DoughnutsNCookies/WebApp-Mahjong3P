@@ -41,7 +41,9 @@ def evaluate(policy, deals: int = 300, bots: str = "normal", envs: int = 64, see
             srv.send(policy(b.obs, b.mask))
     per_round = per_deal / 3 * RM_PER_UNIT
     margin = 2 * per_round.std(ddof=1) / np.sqrt(deals)
-    return {"rm_per_round": float(per_round.mean()), "margin": float(margin), "rounds": rounds}
+    # per_deal: RM per round for each deal, so two versions can be compared deal by deal (paired).
+    return {"rm_per_round": float(per_round.mean()), "margin": float(margin), "rounds": rounds,
+            "per_deal": [round(float(x), 4) for x in per_round]}
 
 
 def model_policy(model: PolicyValue, device: str):

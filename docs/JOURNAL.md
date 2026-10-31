@@ -139,6 +139,27 @@ after 3,165 updates. Its regular checks bounced between +0.28 and +1.10 with no 
 first hour. Paired: best **+0.60 ± 0.19**, final **+0.71 ± 0.19**, the best result so far but improving
 slowly: v2 has largely levelled off, which is the case for v3.
 
+### Measuring better
+
+Regular training checks were 300 fresh deals each, so two checks could differ by +/- 0.48 RM/round on luck
+alone, and best.pt was saved a few updates after the version actually measured. Now every check plays the same
+1,000 practice deals and is compared deal by deal with the best version (about +/- 0.20), best.pt is the
+measured weights, and reported results still come from the separate test deals. Pairing helps less than hoped:
+two versions on the same deal agree only weakly (correlation 0.4), because one different discard changes every
+draw after it.
+
+### The game
+
+Play against the trained AI in the browser (v2n, 1.5 MB, the same moves as PyTorch on 5,017 test positions);
+animations for discards, calls and wins; two table styles (Ink and seal, Macau), each with a night mode; big
+effects and sound, both switchable; taken discards stay on the table greyed out.
+
+### v3 (opponent reading)
+
+Trained 2.3 h from v2n with 132 more inputs about each opponent (danger per tile, early and recent discards,
+tiles they let go). On two separate sets of 1,000 deals it stayed about 0.1 RM/round behind v2n at every check
+(+0.61 vs +0.71 and +0.86 vs +0.97 at update 1,500) and was stopped. v2n stays in the game.
+
 ## Next
 
 - **v3: opponent-aware hints** for defence: for each possible discard, whether it gives an opponent a
