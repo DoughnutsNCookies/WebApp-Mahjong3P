@@ -21,16 +21,21 @@ import { botAction, BotLevel } from '../bots';
 import {
   applyActionInPlace, DEFAULT_RULES, GameState, handValue, makeRng, newRound, playerView, PlayerView, waitingFor,
 } from '../engine';
-import { ACTIONS, encodeHints, encodeOpponents, encodePrivileged, encodeView, HINTS, OBS as VIEW, OPP, PRIV, slotActions } from './encode';
+import {
+  ACTIONS, encodeHints, encodeOpponents, encodePrivileged, encodeView, encodeWall, HINTS, OBS as VIEW, OPP, PRIV as PRIV_BASE, PRIV_WALL,
+  slotActions,
+} from './encode';
 
 type Seat = 'ai' | BotLevel;
-interface Config { envs: number; seats: Seat[]; seed: number; evalDeals?: number; hints?: boolean; opp?: boolean; statsFile?: string }
+interface Config { envs: number; seats: Seat[]; seed: number; evalDeals?: number; hints?: boolean; opp?: boolean; wall?: boolean; statsFile?: string }
 
 const cfg: Config = { envs: 64, seats: ['ai', 'ai', 'ai'], seed: 1, hints: true, opp: false, ...JSON.parse(process.argv[2] ?? '{}') };
 // v1 models see the view only (369 numbers, hints: false); v2 adds the analyzer's hints (431);
 // v3 adds the opponent reading after them (563, opp: true).
 if (cfg.opp && !cfg.hints) throw new Error('opp needs hints (the opponent block comes after the hints)');
 const OBS = VIEW + (cfg.hints ? HINTS : 0) + (cfg.opp ? OPP : 0);
+// wall: the coach also sees the whole wall (encodeWall), after the usual hidden block. Never the player.
+const PRIV = PRIV_BASE + (cfg.wall ? PRIV_WALL : 0);
 const rng = makeRng(cfg.seed);
 const scale = handValue(10, DEFAULT_RULES);
 
@@ -124,7 +129,10 @@ function sendFrame() {
   Buffer.from(obs.buffer).copy(buf, o);
   o += obs.byteLength;
   const priv = new Float32Array(n * PRIV);
-  pending.forEach((d, i) => encodePrivileged(d.env.game!, d.player, priv, i * PRIV));
+  pending.forEach((d, i) => {
+    encodePrivileged(d.env.game!, d.player, priv, i * PRIV);
+    if (cfg.wall) encodeWall(d.env.game!, d.player, priv, i * PRIV + PRIV_BASE);
+  });
   Buffer.from(priv.buffer).copy(buf, o);
   o += priv.byteLength;
   for (const d of pending) { for (let a = 0; a < ACTIONS; a++) buf[o + a] = d.slots[a] ? 1 : 0; o += ACTIONS; }

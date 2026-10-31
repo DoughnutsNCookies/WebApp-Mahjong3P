@@ -304,3 +304,26 @@ export function encodePrivileged(g: GameState, me: number, out: Float32Array, at
   put((g.tail - g.head) / 84);
   if (i - at !== PRIV) throw new Error(`Privileged size mismatch: wrote ${i - at}, expected ${PRIV}`);
 }
+
+// The whole wall, for a coach that sees more (training only, appended after PRIV so an existing coach can be
+// widened): which tiles each player would draw on their next turns if nobody claims, and what is left in
+// the wall altogether. Luck is most of a round's money; the more of it the coach can see, the better it can
+// tell a good decision from a lucky one.
+
+const DRAWS_AHEAD = 8;  // own draws per player
+export const PRIV_WALL = 3 * PER_KIND + PER_KIND;
+
+export function encodeWall(g: GameState, me: number, out: Float32Array, at = 0) {
+  out.fill(0, at, at + PRIV_WALL);
+  // Who draws the next tile from the front: the player after whoever discards next (or just discarded).
+  const nextDrawer = g.phase === 'claim' || g.phase === 'robKong' ? (g.pending!.from + 1) % 3 : (g.turn + 1) % 3;
+  const slot = (t: Kind) => (t === JOKER ? KINDS : isBonus(t) ? KINDS + 1 : t);
+  const front = g.wall.slice(g.head, g.tail);
+  for (let k = 0; k < Math.min(front.length, 3 * DRAWS_AHEAD); k++) {
+    const drawer = (nextDrawer + k) % 3;
+    const rel = (drawer - me + 3) % 3; // 0 me, 1 next player, 2 previous player
+    out[at + rel * PER_KIND + slot(front[k])] += 1 / DRAWS_AHEAD;
+  }
+  for (const t of front) out[at + 3 * PER_KIND + slot(t)] += 1 / 16;
+  for (let k = 0; k < PER_KIND; k++) out[at + 3 * PER_KIND + k] = Math.min(1, out[at + 3 * PER_KIND + k]);
+}

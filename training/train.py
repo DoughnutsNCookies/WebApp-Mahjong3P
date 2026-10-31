@@ -44,6 +44,7 @@ def parse(argv=None):
     ap.add_argument("--dry-run", type=float, default=0, help="seconds of play with no learning, to measure speed")
     ap.add_argument("--run", default="main")
     ap.add_argument("--init-from", type=Path, help="start from this checkpoint's network (new runs only)")
+    ap.add_argument("--wall", action="store_true", help="the coach also sees the whole wall (training only; an --init-from coach is widened)")
     ap.add_argument("--opp", action="store_true", help="v3: also give the AI the opponent reading (a v2 --init-from is widened)")
     ap.add_argument("--servers", type=int, default=16, help="game server processes (CPU cores used for games)")
     ap.add_argument("--envs", type=int, default=192, help="rounds running at once per server")
@@ -240,9 +241,9 @@ def main(argv=None):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     rng = np.random.default_rng(int(time.time()))
     # Self-play servers, plus a few where the AI sits with real bots (what the benchmark measures).
-    makers = [lambda: GameServer(args.envs, ["ai", "ai", "ai"], seed=int(rng.integers(1, 2**31)), opp=args.opp)] * args.servers
+    makers = [lambda: GameServer(args.envs, ["ai", "ai", "ai"], seed=int(rng.integers(1, 2**31)), opp=args.opp, wall=args.wall)] * args.servers
     makers += [lambda: GameServer(args.bot_envs, ["ai", args.bot_level, args.bot_level], seed=int(rng.integers(1, 2**31)),
-                                  opp=args.opp)] * args.bot_servers
+                                  opp=args.opp, wall=args.wall)] * args.bot_servers
     servers = [make() for make in makers]
     selfplay = [True] * args.servers + [False] * args.bot_servers
     # One reader thread per server: whichever servers are ready get their moves, so no server (e.g. one
@@ -286,10 +287,10 @@ def main(argv=None):
             print(f"resumed at update {update}", flush=True)
         elif args.init_from:
             ck = torch.load(args.init_from, map_location=device)
-            if ck["obs"] < sizes["obs"]:
+            if ck["obs"] < sizes["obs"] or ck["priv"] < sizes["priv"]:
                 load_widened(model, ck["model"], ck["obs"], sizes["obs"])
-                print(f"started from {args.init_from}, widened from {ck['obs']} to {sizes['obs']} inputs "
-                      "(the new ones start at zero)", flush=True)
+                print(f"started from {args.init_from}, widened from {ck['obs']}+{ck['priv']} to {sizes['obs']}+{sizes['priv']} "
+                      "inputs (view + coach-only; the new ones start at zero)", flush=True)
             else:
                 model.load_state_dict(ck["model"])
                 print(f"started from {args.init_from}", flush=True)

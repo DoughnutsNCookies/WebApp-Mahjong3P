@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { analyze, inputFromView } from '../src/analyzer';
-import { ACTIONS, actionSlot, encodeHints, encodeOpponents, encodePrivileged, encodeView, HINTS, OBS, OPP, PRIV, slotActions } from '../src/ai/encode';
+import { ACTIONS, actionSlot, encodeHints, encodeOpponents, encodePrivileged, encodeView, encodeWall, HINTS, OBS, OPP, PRIV, PRIV_WALL, slotActions } from '../src/ai/encode';
 import { applyActionInPlace, legalActions, makeRng, newRound, playerView, waitingFor } from '../src/engine';
 
 describe('AI encoding', () => {
@@ -163,6 +163,32 @@ describe('AI encoding', () => {
     altered.wall.reverse();
     encodeOpponents(playerView(altered, 1), b);
     expect(Array.from(b)).toEqual(Array.from(a));
+  });
+
+  it('the whole-wall block (coach only) is in range and gives each draw to the right player', () => {
+    const rng = makeRng(31);
+    const w = new Float32Array(PRIV_WALL);
+    for (let seed = 1; seed <= 30; seed++) {
+      const g = newRound(seed, seed % 3);
+      while (g.phase !== 'ended') {
+        const p = waitingFor(g)[0];
+        encodeWall(g, p, w);
+        expect(Array.from(w).every((x) => x >= 0 && x <= 1)).toBe(true);
+        // The three players' upcoming draws add up to the tiles counted (up to 8 each).
+        const counted = Math.min(g.tail - g.head, 24);
+        const sum = Array.from(w.subarray(0, 54)).reduce((a, x) => a + x, 0) * 8;
+        expect(Math.round(sum)).toBe(counted);
+        const legal = legalActions(g, p);
+        applyActionInPlace(g, legal[Math.floor(rng() * legal.length)]);
+      }
+    }
+    // Dealer (player 0) to discard: the next wall tile goes to player 1, i.e. player 0's "next player" block.
+    const g = newRound(5, 0);
+    encodeWall(g, 0, w);
+    const first = g.wall[g.head];
+    const slot = first === 16 ? 16 : first > 16 ? 17 : first;
+    expect(w[18 + slot]).toBeGreaterThan(0);
+    expect(PRIV_WALL).toBe(72);
   });
 
   it('has the documented sizes', () => {
