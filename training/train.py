@@ -80,7 +80,7 @@ def parse(argv=None):
     ap.add_argument("--pause-when-hot", action="store_true", help="pause above 82 C (off by default)")
     # Stop rule (agreed with Sean): judged on the average of the last 3 benchmarks.
     ap.add_argument("--max-hours", type=float, default=168, help="stop after this long whatever happens (7 days)")
-    ap.add_argument("--patience-hours", type=float, default=12, help="stop if no check has beaten the best version for this long")
+    ap.add_argument("--patience-hours", type=float, default=12, help="stop if no check has clearly beaten the best version for this long")
     ap.add_argument("--target", type=float, default=0.50, help="stop once a confirming benchmark reaches this many RM/round")
     ap.add_argument("--confirm-deals", type=int, default=1000, help="deals in the confirming benchmark (one 300-deal result is +/- 0.35)")
     return ap.parse_args(argv)
@@ -448,17 +448,21 @@ def main(argv=None):
                         d = new - np.array(best["per_deal"])
                         gain, margin = float(d.mean()), float(2 * d.std(ddof=1) / np.sqrt(len(d)))
                     if gain is None or gain > 0:
-                        print(f"  new best version" + (f": {gain:+.2f} +/- {margin:.2f} RM/round better than update {best['update']} on the same deals" if gain is not None else ""), flush=True)
+                        # Any gain updates best.pt, but only a clear one (outside the +/- margin) counts as
+                        # progress for the patience rule: a flat run beats its own best by noise half the time.
+                        clear = gain is None or gain > margin
+                        print(f"  new best version" + (f": {gain:+.2f} +/- {margin:.2f} RM/round better than update {best['update']} on the same deals" if gain is not None else "") + ("" if clear else " (within the margin: not counted as progress)"), flush=True)
                         best = {"update": bu, "rm": r["rm_per_round"], "per_deal": r["per_deal"]}
                         best_file.write_text(json.dumps(best))
                         torch.save(torch.load(run_dir / "bench-done.pt", map_location="cpu") | {"update": bu}, run_dir / "best.pt")
-                        best_at = time.time()
+                        if clear:
+                            best_at = time.time()
                     else:
                         print(f"  {gain:+.2f} +/- {margin:.2f} RM/round compared with the best (update {best['update']}) on the same deals", flush=True)
                     if r["rm_per_round"] >= args.target and bench.start(model, update, sizes, deals=args.confirm_deals, kind="confirm"):
                         print(f"  {r['rm_per_round']:+.2f} on the practice deals: confirming with {args.confirm_deals} other deals", flush=True)
             if not stop_reason and best is not None and time.time() - best_at > args.patience_hours * 3600:
-                stop_reason = f"no check beat the best version (update {best['update']}, {best['rm']:+.2f} RM/round on the practice deals) for {args.patience_hours:g} h"
+                stop_reason = f"no clear gain over the best version for {args.patience_hours:g} h (best: update {best['update']}, {best['rm']:+.2f} RM/round on the practice deals)"
             if not stop_reason and time.time() - t0 > args.max_hours * 3600:
                 stop_reason = f"time limit of {args.max_hours:g} h"
             writer.writerow([time.strftime("%Y-%m-%d %H:%M:%S"), update, f"{rate:.0f}", f"{stats['policy']:.4f}",

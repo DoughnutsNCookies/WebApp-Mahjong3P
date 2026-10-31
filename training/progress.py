@@ -285,8 +285,8 @@ hit.addEventListener('mouseleave', () => {{ tip.style.display = 'none'; cross.se
 LINES = [
     {"name": "v3", "runs": ["v3"], "cls": "s3",
      "about": "v3: also reads the opponents (danger per tile, early and recent discards, tiles they let go); started from v2n's final version"},
-    {"name": "v2", "runs": ["v2trial", "v2", "v2k", "v2n"], "cls": "s1",
-     "about": "v2: also sees the analyzer's hand-reading (hints); started from zero; v2k = from 02:47 with kong money; v2n = overnight from 03:45"},
+    {"name": "v2", "runs": ["v2trial", "v2", "v2k", "v2n", "v2w"], "cls": "s1",
+     "about": "v2: also sees the analyzer's hand-reading (hints); started from zero; v2k = from 02:47 with kong money; v2n = overnight from 03:45; v2w = coach sees the whole wall"},
     {"name": "v1", "runs": ["pilot", "pilot2", "main"], "cls": "s2",
      "about": "v1: raw tiles only; pilot, then the 1-hour trial, then the long run"},
 ]
