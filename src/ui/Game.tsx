@@ -2,12 +2,12 @@
 
 // Live play: the table, your hand, your actions, claims, the hint and the end-of-round result.
 
-import { useEffect, useMemo, useState } from 'react';
+import { CSSProperties, useEffect, useMemo, useState } from 'react';
 import { analyze, claimAdvice, inputFromView } from '../analyzer';
 import { Action, GameState, JOKER, Kind, playerView, waitingFor } from '../engine';
 import { actionLabel } from './format';
 import { BonusLegend } from './BonusLegend';
-import { Caption, latestHappening, useCallouts, winningTile } from './feed';
+import { Caption, latestHappening, riversOf, useCallouts, winningTile } from './feed';
 import { FxLayer } from './Fx';
 import type { Settings } from './storage';
 import { ClaimHint, HintPanel } from './Hint';
@@ -15,24 +15,15 @@ import { ResultPanel } from './Result';
 import { Table } from './Table';
 import { label, Tile } from './Tile';
 
-export function lastDiscardOf(g: GameState): { player: number; index: number } | null {
-  for (let i = g.actions.length - 1; i >= 0; i--) {
-    const a = g.actions[i];
-    if (a.type !== 'discard') continue;
-    const d = g.players[a.player].discards;
-    // Only if it is still on the table (not claimed).
-    return d[d.length - 1] === a.tile ? { player: a.player, index: d.length - 1 } : null;
-  }
-  return null;
-}
-
 /** Your hand, with the drawn tile (or the tile you won on) set slightly apart. */
-function HandRow({ hand, drawn, won, selected, best, onTap }: {
+function HandRow({ hand, drawn, won, selected, best, yourMove, onTap }: {
   hand: Kind[];
   drawn: Kind | null;
   won?: Kind | null;
   selected: Kind | null;
   best: Kind | null;
+  /** Your turn and nothing picked yet: a wave runs through the hand to say "tap a tile". */
+  yourMove?: boolean;
   onTap?: (k: Kind) => void;
 }) {
   const tiles = hand.slice();
@@ -42,21 +33,24 @@ function HandRow({ hand, drawn, won, selected, best, onTap }: {
     const i = tiles.lastIndexOf(apart);
     if (i >= 0) [drawnTile] = tiles.splice(i, 1);
   }
-  const render = (k: Kind, key: string) => (
+  // Only one copy shows as picked (discarding any copy is the same move); the drawn tile if it is one.
+  const pickedKey = selected === null ? null : drawnTile === selected ? 'drawn' : `h${tiles.indexOf(selected)}`;
+  const render = (k: Kind, key: string, i: number) => (
     <Tile
       key={key}
+      style={{ '--i': i } as CSSProperties}
       kind={k}
       size="hand"
-      selected={selected === k}
+      selected={key === pickedKey}
       marked={best === k ? 'best' : undefined}
       fx={key === 'drawn' && won != null ? 'win' : undefined}
       onClick={onTap ? () => onTap(k) : undefined}
     />
   );
   return (
-    <div className="hand-row" aria-label="Your hand">
-      {tiles.map((k, i) => render(k, `h${i}`))}
-      {drawnTile !== null && <span className="drawn">{render(drawnTile, 'drawn')}</span>}
+    <div className={`hand-row${yourMove ? ' your-move' : ''}`} aria-label="Your hand">
+      {tiles.map((k, i) => render(k, `h${i}`, i))}
+      {drawnTile !== null && <span className="drawn">{render(drawnTile, 'drawn', tiles.length)}</span>}
     </div>
   );
 }
@@ -76,6 +70,7 @@ export function Game({ game, names, levels, tally, settings, onAct, onNext, onRe
   const view = useMemo(() => playerView(game, 0), [game]);
   const happening = useMemo(() => latestHappening(game), [game]);
   const winTile = useMemo(() => winningTile(game), [game]);
+  const rivers = useMemo(() => riversOf(game), [game]);
   const callouts = useCallouts(game);
   // "Bot 1 · normal" is just "Bot 1" in the caption, so it fits on a phone line.
   const shortNames = useMemo(() => names.map((n) => n.split(' · ')[0]), [names]);
@@ -133,7 +128,8 @@ export function Game({ game, names, levels, tally, settings, onAct, onNext, onRe
         active={view.phase === 'turn' ? view.turn : undefined}
         winner={game.result?.winner}
         winTile={winTile}
-        lastDiscard={lastDiscardOf(game)}
+        rivers={rivers.rivers}
+        lastDiscard={rivers.newest}
         fresh={happening}
         callouts={callouts}
         thinking={view.phase === 'ended' ? [] : waiting}
@@ -144,6 +140,7 @@ export function Game({ game, names, levels, tally, settings, onAct, onNext, onRe
             won={game.result?.winner === 0 ? winTile : null}
             selected={selected}
             best={analysis?.options[0]?.tile ?? null}
+            yourMove={myTurn && selected === null}
             onTap={myTurn ? tap : undefined}
           />
         }
@@ -170,7 +167,7 @@ export function Game({ game, names, levels, tally, settings, onAct, onNext, onRe
                 <button
                   key={i}
                   type="button"
-                  className={`btn ${a.type === 'win' || a.type === 'openingSlam' ? 'win' : a.type === 'pass' ? '' : 'primary'}`}
+                  className={`btn ${a.type === 'win' || a.type === 'openingSlam' ? 'win cta' : a.type === 'pass' ? '' : 'primary cta'}`}
                   onClick={() => doAct(a)}
                 >
                   {actionLabel(a, view.claimTile)}{a.type === 'win' && winFan ? ` ${winFan} fan` : ''}
@@ -183,13 +180,13 @@ export function Game({ game, names, levels, tally, settings, onAct, onNext, onRe
         {myTurn && (
           <div className="actions">
             {turnButtons.map((a, i) => (
-              <button key={i} type="button" className={`btn ${a.type === 'selfWin' ? 'win' : ''}`} onClick={() => doAct(a)}>
+              <button key={i} type="button" className={`btn ${a.type === 'selfWin' ? 'win cta' : ''}`} onClick={() => doAct(a)}>
                 {actionLabel(a)}{a.type === 'selfWin' && winFan ? ` ${winFan} fan` : ''}
               </button>
             ))}
             <button
               type="button"
-              className="btn primary"
+              className="btn primary cta"
               disabled={selected === null || selected === JOKER || !discardable(selected)}
               onClick={() => selected !== null && doAct({ type: 'discard', player: 0, tile: selected })}
             >

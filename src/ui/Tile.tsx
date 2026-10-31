@@ -2,6 +2,7 @@
 
 // Text-based tiles: a big character with a small English label underneath. Artwork can replace this later.
 
+import type { CSSProperties } from 'react';
 import { bonusNumber, isAnimal, isDot, isFlower, isSeason, JOKER, Kind } from '../engine';
 
 const WIND = ['東', '南', '西', '北'];
@@ -79,11 +80,12 @@ interface Props {
   dim?: boolean;
   /** Table moments: the newest discard, a tile just placed (set or bonus), the tile a round was won on. */
   fx?: 'last' | 'arrive' | 'win';
+  style?: CSSProperties;
   onClick?: () => void;
   title?: string;
 }
 
-export function Tile({ kind, size = 'small', selected, marked, joker, dim, fx, onClick, title }: Props) {
+export function Tile({ kind, size = 'small', selected, marked, joker, dim, fx, style, onClick, title }: Props) {
   const f = face(kind);
   const cls = ['tile', size, f.cls, selected && 'selected', marked && `mark-${marked}`, joker && 'as-joker', dim && 'dim', fx]
     .filter(Boolean).join(' ');
@@ -96,12 +98,12 @@ export function Tile({ kind, size = 'small', selected, marked, joker, dim, fx, o
   );
   if (onClick) {
     return (
-      <button type="button" className={cls} onClick={onClick} title={title ?? label(kind)} aria-label={title ?? label(kind)} aria-pressed={selected}>
+      <button type="button" className={cls} style={style} onClick={onClick} title={title ?? label(kind)} aria-label={title ?? label(kind)} aria-pressed={selected}>
         {content}
       </button>
     );
   }
-  return <span className={cls} title={title ?? label(kind)} role="img" aria-label={title ?? label(kind)}>{content}</span>;
+  return <span className={cls} style={style} title={title ?? label(kind)} role="img" aria-label={title ?? label(kind)}>{content}</span>;
 }
 
 export function TileBack({ count }: { count: number }) {

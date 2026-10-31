@@ -6,7 +6,7 @@
 import { ReactNode } from 'react';
 import { JOKER, Kind, loserFan, Meld, PlayerView, SEAT_NAMES } from '../engine';
 import { FanChip } from './FanChip';
-import type { Callout, Happening } from './feed';
+import type { Callout, Happening, RiverTile } from './feed';
 import { Tile, TileBack } from './Tile';
 import { rmShort } from './format';
 
@@ -22,7 +22,9 @@ interface Props {
   winner?: number;
   /** The tile the round was won on, lifted out of the winner's revealed hand. */
   winTile?: Kind | null;
-  /** The newest discard on the table, to highlight. */
+  /** Every discard in order, taken ones included (greyed out). Without it, only tiles still on the table. */
+  rivers?: RiverTile[][];
+  /** The newest discard on the table, to highlight (an index into ivers when given). */
   lastDiscard?: { player: number; index: number } | null;
   /** What just happened: its set or bonus tile arrives with a short animation. */
   fresh?: Happening | null;
@@ -75,11 +77,17 @@ export function BonusRow({ bonus, jokers, fresh }: { bonus: Kind[]; jokers: numb
   );
 }
 
-function River({ tiles, newest }: { tiles: Kind[]; newest?: number }) {
+function River({ tiles, newest, names }: { tiles: RiverTile[]; newest?: number; names: string[] }) {
   return (
     <Zone label="Discards">
       {tiles.length === 0 ? <span className="muted none">None yet</span> : tiles.map((t, i) => (
-        <Tile key={i} kind={t} fx={i === newest ? 'last' : undefined} title={i === newest ? 'Just discarded' : undefined} />
+        <Tile
+          key={i}
+          kind={t.tile}
+          dim={!!t.taken}
+          fx={i === newest ? 'last' : undefined}
+          title={t.taken ? `Taken by ${names[t.taken.by]} for a ${t.taken.how}` : i === newest ? 'Just discarded' : undefined}
+        />
       ))}
     </Zone>
   );
@@ -107,7 +115,8 @@ function Thinking() {
   return <span className="thinking" role="status" aria-label="thinking"><i /><i /><i /></span>;
 }
 
-export function Table({ view, names, tally, revealed, active, winner, winTile, lastDiscard, fresh, callouts, thinking, hand }: Props) {
+export function Table({ view, names, tally, revealed, active, winner, winTile, rivers, lastDiscard, fresh, callouts, thinking, hand }: Props) {
+  const riverOf = (p: number): RiverTile[] => rivers?.[p] ?? view.players[p].discards.map((tile) => ({ tile }));
   const me = view.me;
   // Turn order is East -> South -> West: the player after you sits on your right.
   const left = (me + 2) % 3;
@@ -141,7 +150,7 @@ export function Table({ view, names, tally, revealed, active, winner, winTile, l
         </Zone>
         <MeldRow melds={o.melds} freshLast={freshSet(p)} />
         <BonusRow bonus={o.bonus} jokers={o.discardedJokers} fresh={freshBonus(p)} />
-        <River tiles={o.discards} newest={lastDiscard?.player === p ? lastDiscard.index : undefined} />
+        <River tiles={riverOf(p)} names={names} newest={lastDiscard?.player === p ? lastDiscard.index : undefined} />
       </section>
     );
   };
@@ -163,7 +172,7 @@ export function Table({ view, names, tally, revealed, active, winner, winTile, l
           <FanChip fan={mine.fan} items={mine.items} />
           {tally && <span className={`money ${tally[me] < 0 ? 'neg' : ''}`}>{rmShort(tally[me])}</span>}
         </header>
-        <River tiles={view.self.discards} newest={lastDiscard?.player === me ? lastDiscard.index : undefined} />
+        <River tiles={riverOf(me)} names={names} newest={lastDiscard?.player === me ? lastDiscard.index : undefined} />
         <MeldRow melds={view.self.melds} freshLast={freshSet(me)} />
         <BonusRow bonus={view.self.bonus} jokers={view.self.discardedJokers} fresh={freshBonus(me)} />
         <Zone label="Your hand">{hand}</Zone>

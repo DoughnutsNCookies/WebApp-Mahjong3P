@@ -52,7 +52,7 @@ export function ResultPanel({ result, names, report, onReview, onNext }: {
       <div className="actions">
         <button type="button" className="btn" onClick={onReview}>Review my play</button>
         <CopyReport input={report} />
-        {onNext && <button type="button" className="btn primary" onClick={onNext}>Next round</button>}
+        {onNext && <button type="button" className="btn primary cta" onClick={onNext}>Next round</button>}
       </div>
     </div>
   );

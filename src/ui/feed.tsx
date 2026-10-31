@@ -80,6 +80,41 @@ export function winningTile(g: GameState): Kind | null {
   return h && (h.what === 'win' || h.what === 'selfWin') ? h.tile ?? null : null;
 }
 
+/** A tile in a player's discard row; `taken` when someone claimed it (it stays shown, greyed out). */
+export interface RiverTile { tile: Kind; taken?: { by: number; how: 'pong' | 'chow' | 'kong' | 'win' } }
+
+/**
+ * Every player's discards in order, including the ones taken for a set or a win (the engine removes
+ * those from the table, but everyone saw them thrown). Also which one is the newest still on the table.
+ */
+export function riversOf(g: GameState): { rivers: RiverTile[][]; newest: { player: number; index: number } | null } {
+  const rivers: RiverTile[][] = [[], [], []];
+  let last: { player: number; index: number } | null = null;
+  // What a win would be on: the newest discard, or a kong being declared (robbing it takes no discard).
+  let offer: 'discard' | 'kong' | null = null;
+  for (const ev of g.events) {
+    if (ev.e === 'claim' && last && last.player === ev.from) {
+      const how = ev.action.type === 'pong' ? 'pong' : ev.action.type === 'chow' ? 'chow' : 'kong';
+      rivers[ev.from][last.index].taken = { by: ev.action.player, how };
+      last = null;
+    }
+    if (ev.e !== 'action') continue;
+    const a = ev.action;
+    if (a.type === 'discard') {
+      rivers[a.player].push({ tile: a.tile });
+      last = { player: a.player, index: rivers[a.player].length - 1 };
+      offer = 'discard';
+    } else if (a.type === 'kong') {
+      offer = 'kong';
+    } else if (a.type === 'win' && offer === 'discard' && last && g.result?.winner === a.player) {
+      // A win is logged when chosen but only takes the tile once the claim window closes and the round ends.
+      rivers[last.player][last.index].taken = { by: a.player, how: 'win' };
+      last = null;
+    }
+  }
+  return { rivers, newest: last };
+}
+
 /** One line describing what just happened, with the tile drawn small. */
 export function Caption({ h, names }: { h: Happening | null; names: string[] }) {
   if (!h) return <span className="muted">New round.</span>;
