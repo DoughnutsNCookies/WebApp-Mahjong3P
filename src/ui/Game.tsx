@@ -2,7 +2,7 @@
 
 // Live play: the table, your hand, your actions, claims, the hint and the end-of-round result.
 
-import { CSSProperties, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { analyze, claimAdvice, inputFromView } from '../analyzer';
 import { Action, GameState, JOKER, Kind, playerView, waitingFor } from '../engine';
 import { actionLabel } from './format';
@@ -22,7 +22,7 @@ function HandRow({ hand, drawn, won, selected, best, yourMove, onTap }: {
   won?: Kind | null;
   selected: Kind | null;
   best: Kind | null;
-  /** Your turn and nothing picked yet: a wave runs through the hand to say "tap a tile". */
+  /** Your turn and nothing picked yet: the hand glows gold to say "tap a tile". */
   yourMove?: boolean;
   onTap?: (k: Kind) => void;
 }) {
@@ -35,10 +35,9 @@ function HandRow({ hand, drawn, won, selected, best, yourMove, onTap }: {
   }
   // Only one copy shows as picked (discarding any copy is the same move); the drawn tile if it is one.
   const pickedKey = selected === null ? null : drawnTile === selected ? 'drawn' : `h${tiles.indexOf(selected)}`;
-  const render = (k: Kind, key: string, i: number) => (
+  const render = (k: Kind, key: string) => (
     <Tile
       key={key}
-      style={{ '--i': i } as CSSProperties}
       kind={k}
       size="hand"
       selected={key === pickedKey}
@@ -49,8 +48,8 @@ function HandRow({ hand, drawn, won, selected, best, yourMove, onTap }: {
   );
   return (
     <div className={`hand-row${yourMove ? ' your-move' : ''}`} aria-label="Your hand">
-      {tiles.map((k, i) => render(k, `h${i}`, i))}
-      {drawnTile !== null && <span className="drawn">{render(drawnTile, 'drawn', tiles.length)}</span>}
+      {tiles.map((k, i) => render(k, `h${i}`))}
+      {drawnTile !== null && <span className="drawn">{render(drawnTile, 'drawn')}</span>}
     </div>
   );
 }

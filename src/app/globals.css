@@ -417,20 +417,20 @@ html[data-mode="night"] .fx-ink .word { color: #ec7b7b; }
 /* Effects: Full waits for the big Hu before stamping the small seal on the winner's box. */
 html[data-effects="full"] .seal { animation-delay: 1.5s; }
 @media (prefers-reduced-motion: reduce) { .fx-layer { display: none; } html[data-effects="full"] .seal { animation-delay: 0s; } }
-/* "Press me": a wave through your hand when it's your move, and a pulsing ring on the button to press
+/* "Press me": your whole hand glows gold when it's your move, and a pulsing ring on the button to press
    next (Discard once a tile is picked, Pong/Kong/Chow/Hu when offered, Next round). On in Full and Calm,
    since it's guidance rather than decoration; reduced motion gets a steady ring instead. Nothing in your
    hand moves while it isn't your turn. */
 @media (prefers-reduced-motion: no-preference) {
-  .hand-row.your-move .tile { animation: nudge 2.6s var(--ease-out) infinite; animation-delay: calc(var(--i, 0) * 60ms); }
+  .hand-row.your-move .tile { animation: rowglow 1.8s ease-in-out infinite; }
   .hand-row .tile.selected { animation: picked 1.4s ease-in-out infinite; }
   .btn.cta:not(:disabled) { animation: cta 1.8s ease-out infinite; }
   .btn.win.cta { animation: cta-win 1.2s ease-out infinite; }
 }
-/* Each tile lifts and lights up gold as the wave passes (keeping the Macau tile's bottom edge). */
-@keyframes nudge {
-  0%, 24%, 100% { translate: 0 0; box-shadow: var(--tile-edge, 0 0 #0000); }
-  10% { translate: 0 -5px; box-shadow: var(--tile-edge, 0 0 #0000), 0 0 0 2px #f0c24f, 0 0 16px #f3d27acc; background: var(--tile-gold); }
+/* The whole hand glows gold together, softly in and out (keeping the Macau tile's bottom edge). */
+@keyframes rowglow {
+  0%, 100% { box-shadow: var(--tile-edge, 0 0 #0000), 0 0 0 1px #f0c24f00, 0 0 0 #f3d27a00; }
+  50% { box-shadow: var(--tile-edge, 0 0 #0000), 0 0 0 2px #f0c24f, 0 0 12px #f3d27aaa; }
 }
 @keyframes picked { 0%, 100% { outline: 2px solid transparent; outline-offset: 2px; } 50% { outline: 2px solid var(--green); outline-offset: 4px; } }
 @keyframes cta {
