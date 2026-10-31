@@ -170,6 +170,19 @@ but its error never dropped (1.05 vs v2n's 1.06), and on the test deals the fina
 the other players do, not the wall. The version picked as best on the practice deals (update 300) tested
 worse than the final one again: picking a best among near-equal versions mostly picks luck.
 
+### Look-ahead search on top of v2n: worse, not better
+
+Before each discard, try the network's top moves in imagined continuations (unseen tiles redealt at random,
+everyone then playing with the network) and pick the best average. Fast (0.2-0.4 s a decision; a 3,000-round
+test takes 8 minutes on 16 cores) and leak-free (rearranging the hidden tiles never changes the choice), but
+it plays much worse than the network alone on the test deals: 4 candidates x 24 rollouts **-0.81** against
++0.71 (1.52 worse); 2 candidates x 64 rollouts +0.13 on 300 deals, 0.61 worse. With search the AI wins 29% of
+rounds instead of 38%. The rollout estimates are too noisy to tell the best discard from the second best
+(a win swings RM4, a difference between discards is a few tenths), so the search ends up roughly tossing a
+coin between them, and the second-best discard is often a hand-breaking one. The network's own judgement is
+the better guide. The harness (scripts/search-bench.ts) reproduces evaluate.py exactly without search and
+reports win and deal-in rates, so it stays.
+
 ## Next
 
 - **v3: opponent-aware hints** for defence: for each possible discard, whether it gives an opponent a

@@ -65,13 +65,18 @@ export function bestSlot(scores: Float32Array, legal: ArrayLike<unknown>): numbe
   return best;
 }
 
-/** The AI's move for `player`, from that player's own view only. */
-export function aiAction(s: GameState, player: number, m: WebModel): Action {
+/** Every legal move for `player` with the AI's score for it, from that player's own view only. */
+export function scoreMoves(s: GameState, player: number, m: WebModel): { slots: (Action | null)[]; scores: Float32Array } {
   const view = playerView(s, player, { copy: false });
   const x = new Float32Array(m.obs);
   encodeView(view, x, 0);
   if (m.hints) encodeHints(view, x, VIEW);
   if (m.opp) encodeOpponents(view, x, VIEW + HINTS);
-  const slots = slotActions(view.legal, view.claimTile);
-  return slots[bestSlot(forward(m, x), slots)]!;
+  return { slots: slotActions(view.legal, view.claimTile), scores: forward(m, x) };
+}
+
+/** The AI's move for `player`, from that player's own view only. */
+export function aiAction(s: GameState, player: number, m: WebModel): Action {
+  const { slots, scores } = scoreMoves(s, player, m);
+  return slots[bestSlot(scores, slots)]!;
 }
