@@ -52,7 +52,7 @@ def parse(argv=None):
     ap.add_argument("--bot-envs", type=int, default=192, help="rounds at once per bot server")
     # Easy bots: the normal bot runs the full analyzer every move and only managed ~300 decisions/s across
     # 4 servers (0.5% of the data), too little to matter. The normal bot stays the benchmark yardstick.
-    ap.add_argument("--bot-level", default="easy", choices=["easy", "normal", "advanced"])
+    ap.add_argument("--bot-level", default="easy", choices=["easy", "normal", "advanced", "hard", "frozen"])
     # v2: 4x the decisions per update and smaller steps, to average out luck (v1: 65,536 and 3e-4).
     ap.add_argument("--steps", type=int, default=262144, help="decisions collected per update")
     ap.add_argument("--minibatch", type=int, default=16384)
@@ -73,7 +73,8 @@ def parse(argv=None):
     # separate fixed set for confirming. Neither is the 1,000-deal test set (seed 777) reported in the journal.
     ap.add_argument("--eval-seed", type=int, default=4242, help="deals for the regular checks (the same every time)")
     ap.add_argument("--confirm-seed", type=int, default=6060, help="deals for the confirming benchmark")
-    ap.add_argument("--eval-bots", default="normal", choices=["easy", "normal", "advanced"])
+    ap.add_argument("--eval-bots", default="normal", choices=["easy", "normal", "advanced", "hard", "frozen"],
+                    help="frozen = the trained AI shipped in the game (public/ai/), as a tougher yardstick")
     ap.add_argument("--save-every", type=int, default=25, help="updates between saves of latest.pt")
     ap.add_argument("--keep-every", type=int, default=500, help="updates between kept snapshots (v2: ~50 min apart)")
     ap.add_argument("--torch-threads", type=int, default=4)

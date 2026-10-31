@@ -59,7 +59,8 @@ def main():
     ap.add_argument("--checkpoint", type=Path)
     ap.add_argument("--random", action="store_true")
     ap.add_argument("--deals", type=int, default=300)
-    ap.add_argument("--bots", default="normal", choices=["easy", "normal", "advanced"])
+    ap.add_argument("--bots", default="normal", choices=["easy", "normal", "advanced", "hard", "frozen"],
+                    help="frozen = the trained AI shipped in the game (public/ai/)")
     ap.add_argument("--json", type=Path, help="also write the result here (used by train.py)")
     ap.add_argument("--seed", type=int, default=7, help="which deals to play (same seed, same deals)")
     ap.add_argument("--stats-file", help="also write each round's details (winner, payer, fan) here, one JSON line each")

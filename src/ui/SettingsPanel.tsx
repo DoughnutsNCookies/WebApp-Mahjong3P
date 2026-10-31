@@ -10,6 +10,7 @@ const LEVELS: { value: Opponent; text: string }[] = [
   { value: 'easy', text: 'Easy: plays for speed only' },
   { value: 'normal', text: 'Normal: speed, fan and defence' },
   { value: 'advanced', text: 'Advanced: normal, and may hold out for bigger fan' },
+  { value: 'hard', text: 'Hard: normal, and looks one step further ahead' },
   { value: 'ai', text: `AI ${WEB_MODEL.name}: trained by playing itself` },
 ];
 

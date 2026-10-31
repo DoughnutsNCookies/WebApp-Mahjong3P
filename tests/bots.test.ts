@@ -16,7 +16,7 @@ function playRound(seed: number, levels: BotLevel[], dealer = 0): { s: GameState
 describe('bots', () => {
   it('play complete legal rounds at both levels', { timeout: 60000 }, () => {
     for (let seed = 1; seed <= 40; seed++) {
-      const { s } = playRound(seed, (['easy', 'normal', 'advanced'] as BotLevel[]).map((_, i, l) => l[(i + seed) % 3]), seed % 3);
+      const { s } = playRound(seed, (['easy', 'normal', 'advanced', 'hard'] as BotLevel[]).map((_, i, l) => l[(i + seed) % 4]).slice(0, 3) as BotLevel[], seed % 3);
       expect(s.result!.total.reduce((a, b) => a + b, 0)).toBe(0);
     }
   });
@@ -92,7 +92,7 @@ describe('bots', () => {
     s.turn = 0;
     s.turnDrew = true;
     s.discardsMade = 5;
-    for (const level of ['easy', 'normal', 'advanced'] as BotLevel[]) {
+    for (const level of ['easy', 'normal', 'advanced', 'hard'] as BotLevel[]) {
       const a = botAction(s, 0, level);
       expect(a.type === 'discardJoker' || a.type === 'selfWin').toBe(true);
     }

@@ -6,13 +6,16 @@
 //           a close opponent, follows the joker advice, and won't claim into a hand that can't pay.
 //   advanced: normal, plus money-based play once ready (see advanced.ts): may turn down a win under
 //           10 fan when holding out is worth more, and picks its wait by expected payout.
+//   hard:   normal, plus one more step of look-ahead on discards and tuned weights (see hard.ts).
 
 import { afterClaim, analyze, AnalyzerInput, DiscardOption, inputFromView, liveCounts, shanten } from '../analyzer';
 import { Action, GameState, JOKER, Kind, playerView } from '../engine';
 import { bestReadyDiscard, decideWin } from './advanced';
+import { hardAnalyze, hardDiscard } from './hard';
 
-export type BotLevel = 'easy' | 'normal' | 'advanced';
+export type BotLevel = 'easy' | 'normal' | 'advanced' | 'hard';
 export * from './advanced';
+export { HARD } from './hard';
 
 export function botAction(s: GameState, player: number, level: BotLevel): Action {
   const view = playerView(s, player);
@@ -60,7 +63,7 @@ function fastest(input: AnalyzerInput): { tile: Kind; shanten: number; live: num
 function turnAction(input: AnalyzerInput, legal: Action[], level: BotLevel): Action {
   const player = legal[0].player;
   const best = level === 'easy' ? fastest(input) : null;
-  const analysis = level !== 'easy' ? analyze(input) : null;
+  const analysis = level === 'easy' ? null : level === 'hard' ? hardAnalyze(input) : analyze(input);
   const bestShanten = best ? best.shanten : (analysis!.options[0]?.shanten ?? 99);
 
   // Kongs: take one when it costs nothing (the replacement draw is free).
@@ -91,6 +94,7 @@ function turnAction(input: AnalyzerInput, legal: Action[], level: BotLevel): Act
   if (level === 'advanced' && analysis!.options[0]?.shanten === 0) {
     tile = bestReadyDiscard(input, analysis!)?.tile ?? tile;
   }
+  if (level === 'hard') tile = hardDiscard(input, analysis!);
   return { type: 'discard', player, tile };
 }
 
@@ -127,7 +131,7 @@ function claimAction(input: AnalyzerInput, legal: Action[], tile: Kind, level: B
       continue;
     }
 
-    const opt: DiscardOption | undefined = analyze(after).options[0];
+    const opt: DiscardOption | undefined = (level === 'hard' ? hardAnalyze(after) : analyze(after)).options[0];
     if (!opt || opt.shanten >= now) continue;
     // Exposing a set gives up concealed routes (7 Pairs, Hidden Treasures); only claim into a hand that
     // can still reach 5 fan.

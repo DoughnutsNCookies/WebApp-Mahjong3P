@@ -16,8 +16,9 @@
 // A frame with nDecisions = 0 and no running games means evaluation is finished.
 // Rewards are each player's money for the round in units of a 10-fan hand value (V at 10 fan).
 
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 import { botAction, BotLevel } from '../bots';
+import { aiAction, parseModel, WEB_MODEL, WebModel } from './web';
 import {
   applyActionInPlace, DEFAULT_RULES, GameState, handValue, makeRng, newRound, playerView, PlayerView, waitingFor,
 } from '../engine';
@@ -26,7 +27,9 @@ import {
   slotActions,
 } from './encode';
 
-type Seat = 'ai' | BotLevel;
+// 'ai' is the learner (the trainer decides); 'frozen' is the trained AI shipped in the game (public/ai/),
+// fixed, as a strong opponent or yardstick; the rest are the rule-based bots.
+type Seat = 'ai' | 'frozen' | BotLevel;
 interface Config { envs: number; seats: Seat[]; seed: number; evalDeals?: number; hints?: boolean; opp?: boolean; wall?: boolean; statsFile?: string }
 
 const cfg: Config = { envs: 64, seats: ['ai', 'ai', 'ai'], seed: 1, hints: true, opp: false, ...JSON.parse(process.argv[2] ?? '{}') };
@@ -47,6 +50,11 @@ if (cfg.evalDeals) {
   for (let d = 0; d < cfg.evalDeals; d++) for (let s = 0; s < 3; s++) jobs.push({ deal: d, aiSeat: s });
 }
 const botLevel = cfg.seats.find((s) => s !== 'ai') ?? 'normal';
+let frozen: WebModel | null = null;
+if (cfg.seats.includes('frozen')) {
+  const w = readFileSync(`public/ai/${WEB_MODEL.file}`);
+  frozen = parseModel(w.buffer.slice(w.byteOffset, w.byteOffset + w.byteLength));
+}
 
 let rounds = 0;
 function startRound(env: Env): boolean {
@@ -95,7 +103,8 @@ function advance(env: Env) {
     const waiting = waitingFor(g);
     const bot = waiting.find((p) => env.seats[p] !== 'ai');
     if (bot !== undefined) {
-      applyActionInPlace(g, botAction(g, bot, env.seats[bot] as BotLevel));
+      const seat = env.seats[bot];
+      applyActionInPlace(g, seat === 'frozen' ? aiAction(g, bot, frozen!) : botAction(g, bot, seat as BotLevel));
       continue;
     }
     // Views are built once, without a copy, and encoded before any further move is made.

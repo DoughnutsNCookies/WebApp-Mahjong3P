@@ -183,6 +183,18 @@ coin between them, and the second-best discard is often a hand-breaking one. The
 the better guide. The harness (scripts/search-bench.ts) reproduces evaluate.py exactly without search and
 reports win and deal-in rates, so it stays.
 
+### A stronger scripted opponent, 1 November
+
+Two attempts. A **hard bot**: the normal bot plus a second step of look-ahead on discards (how good the hand is
+after its next improvement) and weights tuned by coordinate search in the duplicate format (`scripts/bot-bench.ts`
+plays 6,000 rounds in a minute across 16 workers; `scripts/tune-bot.ts`). Result: **+0.08 +/- 0.10 RM/round**
+over the normal bot on fresh deals; the second step alone added nothing. The scripted bot's level is set by
+its heuristics, not by its weights. It is in the game as "Hard" but is not meaningfully stronger.
+
+The stronger fixed opponent we actually have is the trained AI itself: a **`frozen` seat** now lets the game's
+AI (public/ai/, v2n) sit as an opponent in training (`--bot-level frozen`) and as a yardstick
+(`evaluate.py --bots frozen`). It beats the normal bot by RM0.7-1.0 a round and costs less to run.
+
 ## Next
 
 - **v3: opponent-aware hints** for defence: for each possible discard, whether it gives an opponent a
