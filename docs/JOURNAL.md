@@ -160,6 +160,16 @@ Trained 2.3 h from v2n with 132 more inputs about each opponent (danger per tile
 tiles they let go). On two separate sets of 1,000 deals it stayed about 0.1 RM/round behind v2n at every check
 (+0.61 vs +0.71 and +0.86 vs +0.97 at update 1,500) and was stopped. v2n stays in the game.
 
+### A coach that sees the whole wall (v2w)
+
+The coach (training-only critic) was given the next 8 draws of every player and the make-up of the whole
+remaining wall, on the theory that most of a round's money is luck the coach could then see through. Run
+1.7 h from v2n, stopped by the patience rule. The coach used the new inputs (their weights grew from zero)
+but its error never dropped (1.05 vs v2n's 1.06), and on the test deals the final version was level with v2n:
+**+0.68 / +1.08** against +0.71 / +0.97, both within the margin. So the unpredictable part of a round is what
+the other players do, not the wall. The version picked as best on the practice deals (update 300) tested
+worse than the final one again: picking a best among near-equal versions mostly picks luck.
+
 ## Next
 
 - **v3: opponent-aware hints** for defence: for each possible discard, whether it gives an opponent a
