@@ -4,7 +4,7 @@
 
 import { useMemo, useState } from 'react';
 import { Action, applyAction, GameState, newRound, playerView } from '../engine';
-import { actionLabel, rmShort } from './format';
+import { actionLabel, levelName, rmShort } from './format';
 import { CopyReport } from './CopyReport';
 import { Review } from './Review';
 import { deleteLog, exportLogs, loadLogs, SavedRound } from './storage';
@@ -13,7 +13,7 @@ import { Tile } from './Tile';
 import { rulesFor } from './useMatch';
 import { lastDiscardOf } from './Game';
 
-const namesFor = (log: SavedRound) => ['You', `Bot 1 · ${log.levels[0]}`, `Bot 2 · ${log.levels[1]}`];
+const namesFor = (log: SavedRound) => ['You', `Bot 1 · ${levelName(log.levels[0])}`, `Bot 2 · ${levelName(log.levels[1])}`];
 
 function describe(a: Action, names: string[], before: GameState): string {
   const who = a.player === 0 ? 'You' : names[a.player];
@@ -105,7 +105,7 @@ export function Hands() {
                 <div className="actions">
                   <button type="button" className="btn small" onClick={() => setOpen({ log: l, mode: 'review' })}>Review</button>
                   <button type="button" className="btn small" onClick={() => setOpen({ log: l, mode: 'replay' })}>Replay</button>
-                  <CopyReport small input={{ seed: l.seed, dealer: l.dealer, actions: l.actions, rules: rulesFor(l.unitSen), levels: l.levels, date: l.date }} />
+                  <CopyReport small input={{ seed: l.seed, dealer: l.dealer, actions: l.actions, rules: rulesFor(l.unitSen), levels: l.levels.map(levelName), date: l.date }} />
                   <button
                     type="button" className="btn small quiet"
                     onClick={() => { if (confirm('Delete this hand?')) { deleteLog(l.id); setLogs(loadLogs()); } }}

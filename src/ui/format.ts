@@ -1,5 +1,10 @@
 import { Action, Kind } from '../engine';
+import { WEB_MODEL } from '../ai/web';
 import { label } from './Tile';
+import type { Opponent } from './storage';
+
+/** How a bot seat is named on the table and in hand logs. */
+export const levelName = (l: Opponent) => (l === 'ai' ? `AI ${WEB_MODEL.name}` : l);
 
 /** Signed ringgit for tallies: +RM3.00, -RM0.40, RM0.00. */
 export function rmShort(sen: number): string {

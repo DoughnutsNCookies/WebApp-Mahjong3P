@@ -1,22 +1,25 @@
 'use client';
 
 import { useState } from 'react';
-import { BotLevel } from '../bots';
+import { WEB_MODEL } from '../ai/web';
 import { rmShort } from './format';
-import { Settings, Speed } from './storage';
+import { Opponent, Settings, Speed } from './storage';
 
-const LEVELS: { value: BotLevel; text: string }[] = [
+const LEVELS: { value: Opponent; text: string }[] = [
   { value: 'easy', text: 'Easy: plays for speed only' },
   { value: 'normal', text: 'Normal: speed, fan and defence' },
   { value: 'advanced', text: 'Advanced: normal, and may hold out for bigger fan' },
+  { value: 'ai', text: `AI ${WEB_MODEL.name}: trained by playing itself` },
 ];
 
-export function SettingsPanel({ settings, onChange, tally, rounds, onResetTally }: {
+export function SettingsPanel({ settings, onChange, tally, rounds, onResetTally, aiStatus, aiError }: {
   settings: Settings;
   onChange: (s: Settings) => void;
   tally: number[];
   rounds: number;
   onResetTally: () => void;
+  aiStatus: 'off' | 'loading' | 'ready' | 'failed';
+  aiError: string | null;
 }) {
   const [stake, setStake] = useState((settings.unitSen / 100).toFixed(2));
   const saveStake = (v: string) => {
@@ -45,7 +48,7 @@ export function SettingsPanel({ settings, onChange, tally, rounds, onResetTally 
             value={settings.levels[i]}
             onChange={(e) => {
               const levels = [...settings.levels] as Settings['levels'];
-              levels[i] = e.target.value as BotLevel;
+              levels[i] = e.target.value as Opponent;
               onChange({ ...settings, levels });
             }}
           >
@@ -53,6 +56,8 @@ export function SettingsPanel({ settings, onChange, tally, rounds, onResetTally 
           </select>
         </label>
       ))}
+      {aiStatus === 'loading' && <p className="muted">Loading the AI (about 1.5 MB, once)…</p>}
+      {aiStatus === 'failed' && <p className="muted">The AI couldn&apos;t load ({aiError}), so its seat plays as Normal for now.</p>}
       <label className="field">
         <span>Bot speed</span>
         <select value={settings.speed} onChange={(e) => onChange({ ...settings, speed: e.target.value as Speed })}>

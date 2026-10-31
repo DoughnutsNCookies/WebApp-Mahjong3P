@@ -30,8 +30,9 @@ await mkdir(SHOTS, { recursive: true });
 
 const failures = [];
 const runs = [
-  { name: 'phone-webkit', browser: webkit, context: { ...devices['iPhone 13'] } },
-  { name: 'desktop-chromium', browser: chromium, context: { viewport: { width: 1280, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] } },
+  { name: 'phone-webkit', browser: webkit, context: { ...devices['iPhone 13'] }, levels: ['normal', 'normal'] },
+  // Bot 1 is the trained AI here: its weights must load and it must play the round in a real browser.
+  { name: 'desktop-chromium', browser: chromium, context: { viewport: { width: 1280, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] }, levels: ['ai', 'normal'] },
 ];
 
 for (const run of runs) {
@@ -45,12 +46,15 @@ for (const run of runs) {
   page.on('console', (m) => { if (m.type() === 'error' && !ignored(m.text())) errors.push(`console: ${m.text()}`); });
   const shot = (n) => page.screenshot({ path: join(SHOTS, `${run.name}-${n}.png`), fullPage: true });
   const fail = (msg) => failures.push(`${run.name}: ${msg}`);
+  const aiFiles = [];
+  page.on('response', (r) => { if (new URL(r.url()).pathname.startsWith('/ai/')) aiFiles.push(r.status()); });
 
   await page.goto(base);
-  await page.evaluate(() => localStorage.setItem('mj3p.v1.settings', JSON.stringify({ speed: 'fast' })));
+  await page.evaluate((levels) => localStorage.setItem('mj3p.v1.settings', JSON.stringify({ speed: 'fast', levels })), run.levels);
   await page.reload();
   await page.getByRole('navigation', { name: 'Main' }).waitFor();
   await shot('1-start');
+  if (run.levels.includes('ai') && !(await page.getByText(/Bot 1 · AI /).count())) fail('Bot 1 is not shown as the AI');
 
   let hintShot = false;
   let refreshed = false;
@@ -129,6 +133,10 @@ for (const run of runs) {
     await page.getByRole('button', { name: 'Settings' }).click();
     await page.getByLabel('Stake per fan (RM)').waitFor();
     await shot('6-settings');
+  }
+
+  if (run.levels.includes('ai')) {
+    if (!aiFiles.includes(200)) fail(`the AI's weights didn't load (responses: ${aiFiles.join(', ') || 'none'})`);
   }
 
   // Horizontal overflow means something doesn't fit the screen.

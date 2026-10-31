@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Game } from './Game';
 import { Hands } from './Hands';
-import { rmShort } from './format';
+import { levelName, rmShort } from './format';
 import { Review } from './Review';
 import { SettingsPanel } from './SettingsPanel';
 import { useMatch } from './useMatch';
@@ -14,7 +14,8 @@ export function App() {
   const m = useMatch();
   const [tab, setTab] = useState<Tab>('play');
   const [reviewing, setReviewing] = useState(false);
-  const names = ['You', `Bot 1 · ${m.settings.levels[0]}`, `Bot 2 · ${m.settings.levels[1]}`];
+  const levels = m.settings.levels.map(levelName);
+  const names = ['You', `Bot 1 · ${levels[0]}`, `Bot 2 · ${levels[1]}`];
 
   return (
     <div className="app">
@@ -32,7 +33,7 @@ export function App() {
         {tab === 'play' && !m.game && <p className="muted">Shuffling…</p>}
         {tab === 'play' && m.game && !reviewing && (
           <Game
-            game={m.game} names={names} levels={m.settings.levels} tally={m.match.tally}
+            game={m.game} names={names} levels={levels} tally={m.match.tally}
             onAct={m.act}
             onNext={m.nextRound}
             onReview={() => setReviewing(true)}
@@ -49,6 +50,7 @@ export function App() {
           <SettingsPanel
             settings={m.settings} onChange={m.setSettings}
             tally={m.match.tally} rounds={m.match.rounds} onResetTally={m.resetTally}
+            aiStatus={m.aiStatus} aiError={m.aiError}
           />
         )}
       </main>

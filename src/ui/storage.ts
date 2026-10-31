@@ -6,11 +6,14 @@ import type { Action } from '../engine';
 
 export type Speed = 'slow' | 'normal' | 'fast';
 
+/** Who sits in a bot seat: a rule-based bot, or the trained AI (src/ai/web.ts). */
+export type Opponent = BotLevel | 'ai';
+
 export interface Settings {
   /** Stake per fan in sen (RM0.20 = 20). */
   unitSen: number;
   /** Levels of the two bots (players 1 and 2). */
-  levels: [BotLevel, BotLevel];
+  levels: [Opponent, Opponent];
   speed: Speed;
 }
 
@@ -38,7 +41,7 @@ export interface SavedRound {
   seed: number;
   dealer: number;
   unitSen: number;
-  levels: [BotLevel, BotLevel];
+  levels: [Opponent, Opponent];
   actions: Action[];
   /** Short summary for the list. */
   summary: { type: 'win' | 'draw'; winner?: number; fan?: number; myTotal: number };

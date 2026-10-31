@@ -1,12 +1,17 @@
 // Bot vs bot in Node, duplicate format: every deal is played 6 times, once with each seating of the
 // three bots (player 0 always deals). Tile luck cancels out, so differences are down to play.
-// Usage: npx tsx scripts/bots.ts [deals] [levels, e.g. normal,easy,easy] [first seed]
+// Usage: npx tsx scripts/bots.ts [deals] [levels, e.g. normal,easy,easy or ai,normal,normal] [first seed]
+// "ai" is the trained AI exactly as the web game runs it (public/ai/, see src/ai/web.ts).
 
+import { readFileSync } from 'node:fs';
+import { aiAction, parseModel, WEB_MODEL } from '../src/ai/web';
 import { botAction, BotLevel } from '../src/bots';
 import { applyAction, legalActions, newRound, rm, waitingFor } from '../src/engine';
 
 const deals = Number(process.argv[2] ?? 200);
-const levels = (process.argv[3] ?? 'normal,easy,easy').split(',') as BotLevel[];
+const levels = (process.argv[3] ?? 'normal,easy,easy').split(',') as (BotLevel | 'ai')[];
+const weights = levels.includes('ai') ? readFileSync(`public/ai/${WEB_MODEL.file}`) : null;
+const ai = weights && parseModel(weights.buffer.slice(weights.byteOffset, weights.byteOffset + weights.byteLength));
 const firstSeed = Number(process.argv[4] ?? 1000);
 const SEATINGS = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
 
@@ -25,7 +30,8 @@ for (let d = 0; d < deals; d++) {
     let s = newRound(firstSeed + d, 0);
     while (s.phase !== 'ended') {
       const p = waitingFor(s)[0];
-      const a = botAction(s, p, levels[botAt(p)]);
+      const level = levels[botAt(p)];
+      const a = level === 'ai' ? aiAction(s, p, ai!) : botAction(s, p, level);
       const canWin = legalActions(s, p).some((x) => x.type === 'win' || x.type === 'selfWin');
       if (canWin && a.type !== 'win' && a.type !== 'selfWin') declined[botAt(p)]++;
       s = applyAction(s, a);

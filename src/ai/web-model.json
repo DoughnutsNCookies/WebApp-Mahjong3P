@@ -1,0 +1,27 @@
+{
+  "name": "v2",
+  "file": "v2-b0f8f1c36f.bin",
+  "obs": 431,
+  "actions": 42,
+  "hints": true,
+  "opp": false,
+  "layers": [
+    [
+      431,
+      512
+    ],
+    [
+      512,
+      512
+    ],
+    [
+      512,
+      512
+    ],
+    [
+      512,
+      42
+    ]
+  ],
+  "source": "v2n/latest.pt update 3165"
+}

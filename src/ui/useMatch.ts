@@ -4,6 +4,7 @@
 // followed; when a round ends the tally is updated and the hand is saved to the log once.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { aiAction, loadWebModel, WebModel } from '../ai/web';
 import { botAction } from '../bots';
 import { Action, applyAction, DEFAULT_RULES, GameState, newRound, replay, Rules, waitingFor } from '../engine';
 import {
@@ -46,17 +47,34 @@ export function useMatch() {
     if (game) saveCurrent({ seed: game.seed, dealer: game.dealer, unitSen: game.rules.unitSen, actions: game.actions });
   }, [game]);
 
+  // The trained AI's weights, fetched the first time a seat is set to it.
+  const wantAi = settings.levels.includes('ai');
+  const [ai, setAi] = useState<{ model: WebModel | null; error: string | null }>({ model: null, error: null });
+  useEffect(() => {
+    if (!wantAi || ai.model || ai.error) return;
+    let live = true;
+    loadWebModel()
+      .then((model) => live && setAi({ model, error: null }))
+      .catch((e: Error) => live && setAi({ model: null, error: e.message }));
+    return () => { live = false; };
+  }, [wantAi, ai.model, ai.error]);
+  const aiStatus: 'off' | 'loading' | 'ready' | 'failed' = !wantAi ? 'off' : ai.model ? 'ready' : ai.error ? 'failed' : 'loading';
+
   // Bots take their turn.
   useEffect(() => {
     if (!game || game.phase === 'ended') return;
     const bot = waitingFor(game).find((p) => p !== 0);
     if (bot === undefined) return;
+    const level = settings.levels[bot - 1];
+    if (level === 'ai' && aiStatus === 'loading') return; // runs again once the weights arrive
+    const move = (g: GameState) =>
+      level !== 'ai' ? botAction(g, bot, level) : ai.model ? aiAction(g, bot, ai.model) : botAction(g, bot, 'normal');
     const delay = game.phase === 'turn' ? DELAY[settings.speed] : DELAY[settings.speed] / 3;
     const t = setTimeout(() => {
-      setGame((g) => (g && g.phase !== 'ended' ? applyAction(g, botAction(g, bot, settings.levels[bot - 1])) : g));
+      setGame((g) => (g && g.phase !== 'ended' ? applyAction(g, move(g)) : g));
     }, delay);
     return () => clearTimeout(t);
-  }, [game, settings.speed, settings.levels]);
+  }, [game, settings.speed, settings.levels, ai.model, aiStatus]);
 
   // A round just ended: settle the tally and save the hand, once.
   useEffect(() => {
@@ -97,5 +115,5 @@ export function useMatch() {
     saveMatch(m);
   }, [match.dealer]);
 
-  return { settings, setSettings, match, resetTally, game, act, nextRound };
+  return { settings, setSettings, match, resetTally, game, act, nextRound, aiStatus, aiError: ai.error };
 }
