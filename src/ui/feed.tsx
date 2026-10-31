@@ -54,6 +54,16 @@ function happeningAt(g: GameState, at: number): Happening | null {
   }
 }
 
+/** Everything worth showing from event rom on, oldest first. */
+export function happeningsSince(g: GameState, from: number): Happening[] {
+  const out: Happening[] = [];
+  for (let i = Math.max(0, from); i < g.events.length; i++) {
+    const h = happeningAt(g, i);
+    if (h) out.push(h);
+  }
+  return out;
+}
+
 /** The most recent thing worth showing, or null at the start of a round. */
 export function latestHappening(g: GameState): Happening | null {
   for (let i = g.events.length - 1; i >= 0; i--) {

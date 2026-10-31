@@ -50,7 +50,8 @@ for (const run of runs) {
   page.on('response', (r) => { if (new URL(r.url()).pathname.startsWith('/ai/')) aiFiles.push(r.status()); });
 
   await page.goto(base);
-  await page.evaluate((levels) => localStorage.setItem('mj3p.v1.settings', JSON.stringify({ speed: 'fast', levels })), run.levels);
+  await page.evaluate((levels) => localStorage.setItem('mj3p.v1.settings', JSON.stringify({ speed: 'fast', levels, effects: 'calm' })), run.levels);
+  // Calm: the idle motion (breathing tiles) would make every tap target "not stable" for Playwright.
   await page.reload();
   await page.getByRole('navigation', { name: 'Main' }).waitFor();
   await shot('1-start');

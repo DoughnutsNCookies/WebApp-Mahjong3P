@@ -5,6 +5,9 @@ import type { BotLevel } from '../bots';
 import type { Action } from '../engine';
 
 export type Speed = 'slow' | 'normal' | 'fast';
+export type Theme = 'ink' | 'macau';
+export type Night = 'off' | 'on' | 'auto';
+export type Effects = 'full' | 'calm';
 
 /** Who sits in a bot seat: a rule-based bot, or the trained AI (src/ai/web.ts). */
 export type Opponent = BotLevel | 'ai';
@@ -15,9 +18,16 @@ export interface Settings {
   /** Levels of the two bots (players 1 and 2). */
   levels: [Opponent, Opponent];
   speed: Speed;
+  /** Table style, night mode (auto follows the phone), big effects, and sound (off until turned on). */
+  theme: Theme;
+  night: Night;
+  effects: Effects;
+  sound: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { unitSen: 20, levels: ['normal', 'normal'], speed: 'normal' };
+export const DEFAULT_SETTINGS: Settings = {
+  unitSen: 20, levels: ['normal', 'normal'], speed: 'normal', theme: 'ink', night: 'auto', effects: 'full', sound: false,
+};
 
 export interface MatchState {
   /** Net sen per player since the tally was last reset. Player 0 is you. */

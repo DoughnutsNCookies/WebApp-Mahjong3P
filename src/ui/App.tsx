@@ -6,12 +6,14 @@ import { Hands } from './Hands';
 import { levelName, rmShort } from './format';
 import { Review } from './Review';
 import { SettingsPanel } from './SettingsPanel';
+import { useLook } from './look';
 import { useMatch } from './useMatch';
 
 type Tab = 'play' | 'hands' | 'settings';
 
 export function App() {
   const m = useMatch();
+  useLook(m.settings);
   const [tab, setTab] = useState<Tab>('play');
   const [reviewing, setReviewing] = useState(false);
   const levels = m.settings.levels.map(levelName);
@@ -20,6 +22,7 @@ export function App() {
   return (
     <div className="app">
       <nav className="topbar" aria-label="Main">
+        <span className="lanterns" aria-hidden="true"><span className="lantern">福</span><span className="lantern">發</span></span>
         <h1>3P Mahjong</h1>
         {(['play', 'hands', 'settings'] as Tab[]).map((t) => (
           <button key={t} type="button" className={`tab${tab === t ? ' on' : ''}`} aria-current={tab === t ? 'page' : undefined} onClick={() => setTab(t)}>
@@ -33,7 +36,7 @@ export function App() {
         {tab === 'play' && !m.game && <p className="muted">Shuffling…</p>}
         {tab === 'play' && m.game && !reviewing && (
           <Game
-            game={m.game} names={names} levels={levels} tally={m.match.tally}
+            game={m.game} names={names} levels={levels} tally={m.match.tally} settings={m.settings}
             onAct={m.act}
             onNext={m.nextRound}
             onReview={() => setReviewing(true)}

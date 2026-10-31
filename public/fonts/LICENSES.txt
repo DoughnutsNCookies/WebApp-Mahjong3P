@@ -1,0 +1,6 @@
+﻿Font subsets used by the table effects (only the characters the banners show).
+
+- brush-subset.woff2: Ma Shan Zheng, by Ma Shan Zheng. SIL Open Font License 1.1.
+- serif-heavy-subset.woff2: Noto Serif SC (weight 900), by Google. SIL Open Font License 1.1.
+
+Rebuilt with fontTools (pyftsubset); see the commit that added them.

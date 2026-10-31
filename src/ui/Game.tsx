@@ -8,6 +8,8 @@ import { Action, GameState, JOKER, Kind, playerView, waitingFor } from '../engin
 import { actionLabel } from './format';
 import { BonusLegend } from './BonusLegend';
 import { Caption, latestHappening, useCallouts, winningTile } from './feed';
+import { FxLayer } from './Fx';
+import type { Settings } from './storage';
 import { ClaimHint, HintPanel } from './Hint';
 import { ResultPanel } from './Result';
 import { Table } from './Table';
@@ -59,8 +61,9 @@ function HandRow({ hand, drawn, won, selected, best, onTap }: {
   );
 }
 
-export function Game({ game, names, levels, tally, onAct, onNext, onReview }: {
+export function Game({ game, names, levels, tally, settings, onAct, onNext, onReview }: {
   game: GameState;
+  settings: Settings;
   levels: string[];
   names: string[];
   tally: number[];
@@ -81,9 +84,11 @@ export function Game({ game, names, levels, tally, onAct, onNext, onReview }: {
   const [resultFor, setResultFor] = useState<number | null>(null);
   useEffect(() => {
     if (game.phase !== 'ended') return;
-    const t = setTimeout(() => setResultFor(game.seed), game.result?.winner === 0 || game.result?.type === 'draw' ? 450 : 1300);
+    // Full effects play the big Hu (about 2 s) first.
+    const wait = settings.effects === 'full' ? 2100 : game.result?.winner === 0 || game.result?.type === 'draw' ? 450 : 1300;
+    const t = setTimeout(() => setResultFor(game.seed), wait);
     return () => clearTimeout(t);
-  }, [game]);
+  }, [game, settings.effects]);
 
   const myTurn = view.phase === 'turn' && view.turn === 0;
   const prompt = view.phase !== 'turn' && view.phase !== 'ended' && view.legal.length > 0;
@@ -119,6 +124,7 @@ export function Game({ game, names, levels, tally, onAct, onNext, onReview }: {
 
   return (
     <>
+      <FxLayer game={game} names={names} settings={settings} />
       <Table
         view={view}
         names={names}

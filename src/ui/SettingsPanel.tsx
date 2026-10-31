@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { WEB_MODEL } from '../ai/web';
 import { rmShort } from './format';
-import { Opponent, Settings, Speed } from './storage';
+import { setSoundEnabled, unlockSound } from './sound';
+import { Effects, Night, Opponent, Settings, Speed, Theme } from './storage';
 
 const LEVELS: { value: Opponent; text: string }[] = [
   { value: 'easy', text: 'Easy: plays for speed only' },
@@ -58,6 +59,44 @@ export function SettingsPanel({ settings, onChange, tally, rounds, onResetTally,
       ))}
       {aiStatus === 'loading' && <p className="muted">Loading the AI (about 1.5 MB, once)…</p>}
       {aiStatus === 'failed' && <p className="muted">The AI couldn&apos;t load ({aiError}), so its seat plays as Normal for now.</p>}
+      <label className="field">
+        <span>Table style</span>
+        <select value={settings.theme} onChange={(e) => onChange({ ...settings, theme: e.target.value as Theme })}>
+          <option value="ink">Ink and seal 水墨: paper table, brush calls, red seal</option>
+          <option value="macau">Macau 澳門: felt table, gold calls, coin shower</option>
+        </select>
+      </label>
+      <label className="field">
+        <span>Night mode</span>
+        <select value={settings.night} onChange={(e) => onChange({ ...settings, night: e.target.value as Night })}>
+          <option value="auto">Match my phone</option>
+          <option value="off">Off (day)</option>
+          <option value="on">On (night)</option>
+        </select>
+      </label>
+      <label className="field">
+        <span>Effects</span>
+        <select value={settings.effects} onChange={(e) => onChange({ ...settings, effects: e.target.value as Effects })}>
+          <option value="full">Full: shakes, flashes, big calls and wins</option>
+          <option value="calm">Calm: highlights only</option>
+        </select>
+        <small className="muted">Phones set to reduce motion always get Calm.</small>
+      </label>
+      <label className="field">
+        <span>Sound</span>
+        <select
+          value={settings.sound ? 'on' : 'off'}
+          onChange={(e) => {
+            const sound = e.target.value === 'on';
+            onChange({ ...settings, sound });
+            setSoundEnabled(sound);
+            if (sound) unlockSound(); // inside the tap, so the browser allows it
+          }}
+        >
+          <option value="off">Off</option>
+          <option value="on">On: tile clacks, drum for calls, gong for a win</option>
+        </select>
+      </label>
       <label className="field">
         <span>Bot speed</span>
         <select value={settings.speed} onChange={(e) => onChange({ ...settings, speed: e.target.value as Speed })}>

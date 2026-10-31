@@ -13,6 +13,25 @@
   --dots: #24477a;
   --joker: #b4561b;
   --gap: 4px;
+  /* Text and lines inside panels (boxes, prompts, result), and form fields. Same as the page here;
+     the Macau table has light text on felt but dark text in its cream panels. */
+  --panel-ink: #1f1d1a;
+  --panel-muted: #6b665c;
+  --panel-line: #cfc6b4;
+  --field: #fffdf7;
+  --green-strong: #1f5c46;
+  --red-strong: #a3242a;
+  /* Tile faces stay ivory with dark characters in every theme. */
+  --tile-ink: #1f1d1a;
+  --tile-red: #a3242a;
+  --tile-green: #1f5c46;
+  --tile-bonus: #7a4b8c;
+  --tile-white: #5a6b80;
+  --tile-back: #e2dccd;
+  --tile-concealed: #ece6d8;
+  --tile-wash: #fbeee2;
+  --tile-gold: #fbf1d6;
+  --seal: #a3242a;
   --gold: #b8892b;
   --gold-wash: #fbf1d6;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -32,6 +51,7 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: var(--paper); }
+body { background: var(--page-bg, var(--paper)); background-attachment: fixed; color: var(--ink); }
 body { min-height: 100dvh; -webkit-text-size-adjust: 100%; }
 h1, h2, h3 { font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; font-weight: 600; }
 h2 { font-size: 1.25rem; margin: 0; }
@@ -48,7 +68,7 @@ main { flex: 1; }
 .topbar { display: flex; align-items: center; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--paper); z-index: 2; }
 .topbar h1 { font-size: 1.05rem; margin: 0 auto 0 0; white-space: nowrap; }
 .tab { border: 1px solid transparent; background: none; padding: 8px 10px; min-height: 40px; border-radius: 6px; cursor: pointer; }
-.tab.on { border-color: var(--line); background: var(--panel); font-weight: 600; }
+.tab.on { border-color: var(--line); background: var(--panel); color: var(--panel-ink); font-weight: 600; }
 .topbar .money { margin-left: 4px; white-space: nowrap; }
 @media (max-width: 359px) { .topbar h1 { display: none; } .topbar .tab:first-of-type { margin-left: auto; } }
 @media (max-width: 420px) {
@@ -58,17 +78,17 @@ main { flex: 1; }
 }
 
 /* Buttons */
-.btn { min-height: 44px; padding: 8px 14px; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; cursor: pointer; }
+.btn { min-height: 44px; padding: 8px 14px; border: 1px solid var(--line); background: var(--panel); color: var(--panel-ink); border-radius: 8px; cursor: pointer; }
 .btn:disabled { opacity: 0.5; cursor: default; }
-.btn.primary { background: var(--green); border-color: var(--green); color: #fff; }
-.btn.win { background: var(--red); border-color: var(--red); color: #fff; font-weight: 700; }
+.btn.primary { background: var(--green-strong); border-color: var(--green-strong); color: #fff; }
+.btn.win { background: var(--red-strong); border-color: var(--red-strong); color: #fff; font-weight: 700; }
 .btn.small { min-height: 36px; padding: 6px 10px; font-size: 0.9rem; }
 .btn.quiet { border-color: transparent; color: var(--muted); }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 .hint-toggle { margin-top: 4px; }
 
 /* Tiles */
-.tile { position: relative; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; background: var(--tile); border: 1px solid var(--tile-line); border-radius: 5px; line-height: 1; padding: 0; user-select: none; }
+.tile { position: relative; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; background: var(--tile); color: var(--tile-ink); border: 1px solid var(--tile-line); border-radius: 5px; line-height: 1; padding: 0; user-select: none; }
 .tile.small { width: var(--small-w); height: calc(var(--small-w) * 1.32); }
 .tile.small .main { font-size: calc(var(--small-w) * 0.55); }
 .tile.small .sub { display: none; }
@@ -86,13 +106,13 @@ main { flex: 1; }
 .pip-k .ring { fill: #1d1d1b; }
 .pip-r .ring { fill: #b3262c; }
 .dot-face .centre-red { fill: #b3262c; }
-.tile.red .main { color: var(--red); }
-.tile.green .main { color: var(--green); }
-.tile.white .main { color: #5a6b80; }
+.tile.red .main { color: var(--tile-red); }
+.tile.green .main { color: var(--tile-green); }
+.tile.white .main { color: var(--tile-white); }
 .tile.joker .main, .tile.as-joker .main { color: var(--joker); }
-.tile.bonus .main { color: #7a4b8c; }
+.tile.bonus .main { color: var(--tile-bonus); }
 /* Flower/season number in the corner, readable even on small tiles. */
-.tile .num { position: absolute; top: 1px; right: 2px; font-size: 9px; font-weight: 700; color: #7a4b8c; line-height: 1; }
+.tile .num { position: absolute; top: 1px; right: 2px; font-size: 9px; font-weight: 700; color: var(--tile-bonus); line-height: 1; }
 .tile.hand .num { font-size: max(9px, calc(var(--hand-w) * 0.26)); top: 2px; right: 3px; }
 .legend { margin: 12px 0; font-size: 0.92rem; }
 .legend summary { cursor: pointer; min-height: 36px; display: flex; align-items: center; color: var(--muted); }
@@ -101,7 +121,7 @@ main { flex: 1; }
 .legend tr.yours td:first-child { font-weight: 700; }
 .legend .animals { display: flex; flex-wrap: wrap; gap: 3px; }
 .tile.as-joker { border-style: dashed; border-color: var(--joker); }
-.tile.back { background: #e2dccd; color: var(--muted); font-size: 0.8rem; font-weight: 600; }
+.tile.back { background: var(--tile-back); color: var(--muted); font-size: 0.8rem; font-weight: 600; }
 .tile.selected { transform: translateY(-8px); border: 2px solid var(--green); }
 .tile.mark-best { outline: 2px solid var(--green); outline-offset: 1px; }
 .tile.mark-bad { outline: 2px solid var(--red); outline-offset: 1px; }
@@ -111,6 +131,8 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
 /* Table */
 .table { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
 .opponents { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+/* Panels carry their own text colours (see --panel-ink). */
+.opp, .me, .panel, .prompt, .review-item, .fan-pop { --ink: var(--panel-ink); --muted: var(--panel-muted); --line: var(--panel-line); color: var(--ink); }
 .opp, .me { position: relative; border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: var(--panel); min-width: 0; transition: border-color 200ms, background-color 450ms; }
 .opp.active, .me.active { border-color: var(--green); }
 /* The round's winner: a gold box. */
@@ -119,7 +141,7 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
 .opp header .money, .me header .money { margin-left: auto; }
 .seat { color: var(--muted); font-size: 0.8rem; }
 .fan-chip-wrap { display: contents; }
-.fan-chip { border: 1px solid var(--line); background: var(--tile); border-radius: 999px; padding: 2px 9px; min-height: 28px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+.fan-chip { border: 1px solid var(--line); background: var(--field); border-radius: 999px; padding: 2px 9px; min-height: 28px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
 .fan-chip.five { border-color: var(--green); color: var(--green); }
 .fan-pop { display: block; flex-basis: 100%; order: 10; font-size: 0.8rem; color: var(--muted); font-weight: 400; margin-top: 2px; }
 .opp header, .me header { position: relative; }
@@ -128,7 +150,7 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
 .zone-tiles { display: flex; flex-wrap: wrap; gap: 2px; align-items: flex-end; }
 .zone-tiles .none { font-size: 0.8rem; }
 .meld { display: inline-flex; gap: 1px; padding-right: 6px; }
-.meld.concealed .tile { background: #ece6d8; }
+.meld.concealed .tile { background: var(--tile-concealed); }
 .hand-row { display: flex; flex-wrap: nowrap; gap: var(--hand-gap); padding-top: 8px; align-items: flex-end; }
 .hand-row .drawn { margin-left: calc(var(--hand-w) * 0.35); }
 @media (max-width: 759px) { .me { padding: 8px 6px; } }
@@ -175,7 +197,7 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
 
 /* Review */
 .review-list { list-style: none; padding: 0; margin: 0; }
-.review-item { border: 1px solid var(--line); border-left-width: 4px; border-radius: 6px; padding: 8px; margin: 8px 0; background: var(--tile); }
+.review-item { border: 1px solid var(--line); border-left-width: 4px; border-radius: 6px; padding: 8px; margin: 8px 0; background: var(--field); }
 .review-item.v-best { border-left-color: var(--green); }
 .review-item.v-fine { border-left-color: #8aa596; }
 .review-item.v-mistake { border-left-color: #c98a2c; }
@@ -187,7 +209,7 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
 
 /* Copy for Claude fallback */
 .copy-box { flex-basis: 100%; }
-.copy-box textarea { width: 100%; font: 0.8rem/1.4 ui-monospace, Menlo, Consolas, monospace; border: 1px solid var(--line); border-radius: 6px; padding: 6px; background: var(--tile); }
+.copy-box textarea { width: 100%; font: 0.8rem/1.4 ui-monospace, Menlo, Consolas, monospace; border: 1px solid var(--line); border-radius: 6px; padding: 6px; background: var(--field); color: var(--ink); }
 
 /* Saved hands, replay, settings */
 .log-list { list-style: none; padding: 0; margin: 0; }
@@ -196,7 +218,7 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
 .replay-controls { display: flex; gap: 8px; align-items: center; }
 .replay-controls input { flex: 1; min-height: 36px; }
 .settings .field { display: flex; flex-direction: column; gap: 6px; margin: 14px 0; }
-.settings input, .settings select { min-height: 44px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--tile); max-width: 420px; }
+.settings input, .settings select { min-height: 44px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); max-width: 420px; }
 .settings .field p { margin: 0; }
 .foot { font-size: 0.78rem; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 20px; }
 
@@ -204,7 +226,7 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
    are stamped onto the player who made them. Everything is visible without the animation. */
 
 /* The newest discard drops onto its row and keeps an orange edge until the next one. */
-.tile.last { outline: 2px solid var(--joker); outline-offset: 1px; background: #fbeee2; animation: land 420ms var(--ease-out); }
+.tile.last { outline: 2px solid var(--joker); outline-offset: 1px; background: var(--tile-wash); animation: land 420ms var(--ease-out); }
 @keyframes land {
   from { transform: translateY(-18px) scale(1.35); opacity: 0; }
   45% { opacity: 1; }
@@ -218,11 +240,11 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
 .callout {
   position: absolute; top: -13px; left: 50%; z-index: 3; pointer-events: none; white-space: nowrap;
   font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; font-weight: 700; font-size: 0.95rem;
-  padding: 1px 10px; border: 1px solid currentColor; border-radius: 4px; background: var(--paper);
+  padding: 1px 10px; border: 1px solid currentColor; border-radius: 4px; background: var(--field);
   transform: translateX(-50%); animation: call 1600ms var(--ease-out) forwards;
 }
 .callout.tone-set { color: var(--green); }
-.callout.tone-bonus { color: #7a4b8c; }
+.callout.tone-bonus { color: var(--bonus-ui, #7a4b8c); }
 .callout.tone-fei { color: var(--joker); }
 @keyframes call {
   0% { opacity: 0; transform: translateX(-50%) scale(1.7); }
@@ -234,7 +256,7 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
 /* Hu! A red seal (chop) stamped next to the winner's name. */
 .seal {
   display: inline-grid; place-items: center; width: 30px; height: 30px; flex: none; align-self: center;
-  background: var(--red); color: #fdf3e3; border: 2px solid #fdf3e3; outline: 2px solid var(--red);
+  background: var(--seal); color: #fdf3e3; border: 2px solid #fdf3e3; outline: 2px solid var(--seal);
   border-radius: 3px; font: 700 19px/1 "Songti SC", "SimSun", "Noto Serif CJK SC", serif;
   transform: rotate(-8deg); animation: seal 560ms var(--ease-out) both;
 }
@@ -245,7 +267,7 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
 }
 /* The tile the round was won on: set apart in the winner's hand, gold-edged, lifted once the seal lands. */
 .win-gap { display: inline-flex; margin-left: 8px; }
-.tile.win { outline: 2px solid var(--gold); outline-offset: 1px; background: var(--gold-wash); animation: lift 480ms var(--ease-out) 300ms both; }
+.tile.win { outline: 2px solid var(--gold); outline-offset: 1px; background: var(--tile-gold); animation: lift 480ms var(--ease-out) 300ms both; }
 @keyframes lift { from { transform: none; } to { transform: translateY(-5px); } }
 
 /* A bot deciding. */
@@ -270,3 +292,133 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
   .callout { animation: call-fade 1600ms linear forwards; }
 }
 @keyframes call-fade { 0% { opacity: 0; } 10%, 80% { opacity: 1; } 100% { opacity: 0; } }
+/* ===================================================================================================
+   Table styles (Settings): html[data-theme] is "ink" (default, above) or "macau"; html[data-mode] is
+   "day" or "night". Set before first paint by the script in layout.tsx.
+   =================================================================================================== */
+
+@font-face { font-family: "MJ Brush"; src: url("/fonts/brush-subset.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "MJ Heavy"; src: url("/fonts/serif-heavy-subset.woff2") format("woff2"); font-weight: 900; font-display: swap; }
+
+/* Ink at night: a dark inkstone table, the tiles still ivory. */
+html[data-mode="night"] {
+  --paper: #15130f; --panel: #1f1c16; --ink: #ece4d2; --muted: #a49a85; --line: #3b362b;
+  --panel-ink: #ece4d2; --panel-muted: #a49a85; --panel-line: #3b362b; --field: #2a261e;
+  --green: #6cc09a; --red: #ec7b7b; --dots: #9db8e8; --joker: #e9944f; --gold: #d9ab4e; --gold-wash: #3a2f17; --bonus-ui: #c9a2dc;
+  --green-strong: #2f7a5a; --red-strong: #b3343a;
+  --tile: #ece4cf; --tile-line: #8f8468; --tile-back: #3a352a; --tile-concealed: #d6ccb2; --tile-wash: #f4dcc2; --tile-gold: #f6e0a6;
+  color-scheme: dark;
+}
+html[data-mode="night"] .tile.back { color: #cfc5ad; }
+
+/* Macau by day: emerald felt, cream panels, gold trim. Text on the felt is light. */
+html[data-theme="macau"] {
+  --paper: #17603f; --page-bg: radial-gradient(120% 90% at 50% 30%, #23855a, #17603f 55%, #0f4a31);
+  --ink: #f7efd8; --muted: #c4dccb; --line: #c9a24a99;
+  --panel: #f8f1dd; --panel-ink: #22201b; --panel-muted: #6e6146; --panel-line: #dccb9b; --field: #fffaf0;
+  --green: #1f6b48; --red: #a3242a; --gold: #c9a24a; --gold-wash: #fbefc9; --bonus-ui: #7a4b8c;
+  --green-strong: #1f6b48; --red-strong: #a3242a;
+  --tile-line: #b38f3e;
+}
+/* Macau at night: deep felt, dark lacquer panels, gold everything. */
+html[data-theme="macau"][data-mode="night"] {
+  --paper: #0a2e20; --page-bg: radial-gradient(120% 90% at 50% 30%, #155c3d, #0a2e20 60%, #061a12);
+  --ink: #f5e7c4; --muted: #b9c9b0; --line: #c9a24a66;
+  --panel: #0d3a29; --panel-ink: #f5e7c4; --panel-muted: #c3b48b; --panel-line: #c9a24a55; --field: #0f4732;
+  --green: #7ad3a3; --red: #f08080; --gold: #f3d27a; --gold-wash: #3b3110; --bonus-ui: #e0b8f0;
+  --green-strong: #1f7a52; --red-strong: #b3262c;
+  --tile: #f7efda; --tile-back: #1d5a40; --tile-concealed: #e3d6b4; --tile-wash: #fbe2b8; --tile-gold: #f8e3a4;
+  color-scheme: dark;
+}
+html[data-theme="macau"][data-mode="night"] .tile.back { color: #f3d27a; }
+html[data-theme="macau"] .topbar { background: var(--paper); }
+/* Your tally sits on the felt, not in a panel. */
+html[data-theme="macau"] .topbar .money { color: #f3d27a; }
+html[data-theme="macau"] .topbar .money.neg { color: #ffb4a8; }
+html[data-theme="macau"] .opp, html[data-theme="macau"] .me { border-color: var(--gold); }
+html[data-theme="macau"] .tile { background: linear-gradient(var(--tile), #ece0c0); box-shadow: 0 2px 0 #8a6a25; }
+html[data-theme="macau"] .tile.back { background: var(--tile-back); }
+html[data-theme="macau"] .tile.win { background: var(--tile-gold); }
+html[data-theme="macau"] .tile.last { background: var(--tile-wash); }
+html[data-theme="macau"] .opp.winner, html[data-theme="macau"] .me.winner { box-shadow: 0 0 0 1px var(--gold), 0 0 26px #f3d27a88; }
+html[data-theme="macau"] .topbar h1 { font-family: "MJ Heavy", "Iowan Old Style", Georgia, serif; }
+
+/* Macau lanterns beside the title. */
+.lanterns { display: none; gap: 6px; margin-right: 4px; }
+html[data-theme="macau"] .lanterns { display: inline-flex; }
+/* On a phone the lanterns replace the title, so the tabs still fit. */
+@media (max-width: 440px) { html[data-theme="macau"] .topbar h1 { display: none; } html[data-theme="macau"] .lanterns { margin-right: auto; } }
+.lantern { position: relative; width: 18px; height: 23px; border-radius: 45%; background: radial-gradient(circle at 50% 40%, #ff5a3c, #b3141c 70%);
+  color: #f3d27a; font: 900 11px/23px "MJ Heavy", serif; text-align: center; transform-origin: 50% -6px; }
+html[data-mode="night"] .lantern { box-shadow: 0 0 14px #ff3a2a99; }
+.lantern::after { content: ""; position: absolute; left: 50%; bottom: -6px; height: 6px; border-left: 2px solid #f3d27a; }
+
+/* Ink mist drifting behind the table. */
+html:not([data-theme="macau"]) body::before {
+  content: ""; position: fixed; inset: -20%; z-index: -1; pointer-events: none; opacity: 0.55;
+  background: radial-gradient(38% 28% at 18% 30%, #d8d0bf66, transparent 70%), radial-gradient(34% 26% at 82% 70%, #d8d0bf77, transparent 70%);
+}
+html[data-mode="night"]:not([data-theme="macau"]) body::before {
+  background: radial-gradient(38% 28% at 18% 30%, #ffffff0d, transparent 70%), radial-gradient(34% 26% at 82% 70%, #ffffff12, transparent 70%);
+}
+
+/* Idle life (Effects: Full only). */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-effects="full"] .lantern { animation: sway 3s ease-in-out infinite; }
+  html[data-effects="full"] .lantern:nth-child(2) { animation-delay: -1.4s; }
+  html[data-effects="full"]:not([data-theme="macau"]) body::before { animation: drift 18s ease-in-out infinite alternate; }
+  html[data-effects="full"] .hand-row .tile { animation: breathe 3.4s ease-in-out infinite; }
+  html[data-effects="full"] .hand-row .tile:nth-child(3n+1) { animation-delay: -1.1s; }
+  html[data-effects="full"] .hand-row .tile:nth-child(3n+2) { animation-delay: -2.2s; }
+  html[data-effects="full"] .hand-row .tile.selected { animation: none; }
+  html[data-effects="full"][data-theme="macau"] .hand-row .tile { animation-name: shimmer; animation-duration: 4.5s; }
+  html[data-effects="full"] .opp.active, html[data-effects="full"] .me.active { animation: inkpulse 2.4s ease-in-out infinite; }
+  html[data-effects="full"][data-theme="macau"] .opp.active, html[data-effects="full"][data-theme="macau"] .me.active { animation: goldglow 1.8s ease-in-out infinite; }
+}
+@keyframes sway { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+@keyframes drift { to { transform: translate(6%, -4%) scale(1.08); } }
+@keyframes breathe { 0%, 100% { translate: 0 0; } 50% { translate: 0 -2px; } }
+@keyframes shimmer { 0%, 86%, 100% { filter: none; } 92% { filter: brightness(1.15); } }
+@keyframes inkpulse { 0%, 100% { border-color: var(--line); } 50% { border-color: var(--green); } }
+@keyframes goldglow { 0%, 100% { box-shadow: 0 0 0 1px var(--gold), 0 0 6px #f3d27a22; } 50% { box-shadow: 0 0 0 1px #f3d27a, 0 0 20px #f3d27a88; } }
+
+/* ---------------------------------------------------------------------------------------------------
+   Big moments (Effects: Full): a banner over the table, a flash, a shake, ink or coins. See Fx.tsx.
+   --------------------------------------------------------------------------------------------------- */
+.fx-layer { position: fixed; inset: 0; pointer-events: none; z-index: 20; overflow: hidden; }
+.fx-flash { position: absolute; inset: 0; opacity: 0; }
+.fx-banner { position: absolute; left: 50%; top: 42%; display: grid; place-items: center; text-align: center; translate: -50% -50%; }
+.fx-banner .who { position: relative; margin-top: 6px; padding: 3px 12px; border-radius: 999px; font: 700 0.95rem system-ui, sans-serif; background: var(--panel); border: 1px solid var(--line); color: var(--panel-ink); }
+.fx-banner .who:empty { display: none; }
+.fx-bit { position: absolute; left: 50%; top: 42%; }
+.shake-1 { animation: shake1 320ms linear; }
+.shake-2 { animation: shake2 480ms linear; }
+.shake-3 { animation: shake3 760ms linear; }
+@keyframes shake1 { 20% { transform: translate(-4px, 2px); } 40% { transform: translate(4px, -2px); } 60% { transform: translate(-3px, 1px); } 80% { transform: translate(2px, 0); } }
+@keyframes shake2 { 10% { transform: translate(-9px, 4px) rotate(-0.5deg); } 25% { transform: translate(8px, -5px) rotate(0.4deg); } 40% { transform: translate(-7px, 3px); } 55% { transform: translate(6px, -2px); } 70% { transform: translate(-4px, 2px); } 85% { transform: translate(2px, -1px); } }
+@keyframes shake3 { 6% { transform: translate(-16px, 8px) rotate(-1deg); } 14% { transform: translate(15px, -9px) rotate(0.9deg); } 24% { transform: translate(-13px, 6px) rotate(-0.7deg); } 34% { transform: translate(11px, -6px) rotate(0.5deg); } 46% { transform: translate(-8px, 4px); } 58% { transform: translate(6px, -3px); } 72% { transform: translate(-3px, 2px); } 86% { transform: translate(2px, -1px); } }
+
+/* Ink: a brush character on an ink blot; Hu is a giant red chop. */
+.fx-ink .blot { position: absolute; width: 260px; height: 220px; fill: #1112; }
+html[data-mode="night"] .fx-ink .blot { fill: #0009; }
+.fx-ink .char { position: relative; font: 400 150px/1 "MJ Brush", "STKaiti", "KaiTi", serif; color: #111; }
+html[data-mode="night"] .fx-ink .char { color: #f3ead6; text-shadow: 0 0 18px #000; }
+.fx-ink .word { position: relative; margin-top: -8px; font: 900 1.15rem "MJ Heavy", Georgia, serif; letter-spacing: 0.3em; color: #a3242a; }
+html[data-mode="night"] .fx-ink .word { color: #ec7b7b; }
+.fx-gold .who { background: #0a2e20; border-color: #c9a24a; }
+.fx-seal { width: 190px; height: 190px; display: grid; place-items: center; background: #a3242a; color: #fdf3e3; border: 6px solid #fdf3e3; outline: 6px solid #a3242a;
+  border-radius: 8px; font: 400 150px/1 "MJ Brush", "STKaiti", serif; }
+/* Macau: gold characters on spinning rays; Hu showers square-holed coins. */
+.fx-gold .rays { position: absolute; width: 440px; height: 440px; border-radius: 50%; background: repeating-conic-gradient(#f3d27a55 0 8deg, transparent 8deg 20deg);
+  mask: radial-gradient(circle, #000 20%, transparent 65%); animation: spin 6s linear infinite; }
+@keyframes spin { to { rotate: 360deg; } }
+.fx-gold .char { position: relative; font: 900 140px/1 "MJ Heavy", Georgia, serif; color: #f7d774; -webkit-text-stroke: 3px #7a4a10; paint-order: stroke fill; text-shadow: 0 6px 0 #7a4a10, 0 0 30px #ffd76a; }
+.fx-gold .word { position: relative; margin-top: 4px; font: 900 1.3rem "MJ Heavy", Georgia, serif; letter-spacing: 0.22em; color: #fff3cf; text-shadow: 0 2px 0 #7a4a10; }
+.fx-gold .who { color: #fff3cf; }
+.fx-coin { width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff2b0, #e2b13c 45%, #a8761c); box-shadow: inset 0 0 0 2px #8a5e14; }
+.fx-coin::after { content: ""; position: absolute; inset: 9px; background: #0a2e20; outline: 2px solid #8a5e14; }
+.fx-drop { border-radius: 50%; }
+
+/* Effects: Full waits for the big Hu before stamping the small seal on the winner's box. */
+html[data-effects="full"] .seal { animation-delay: 1.5s; }
+@media (prefers-reduced-motion: reduce) { .fx-layer { display: none; } html[data-effects="full"] .seal { animation-delay: 0s; } }
