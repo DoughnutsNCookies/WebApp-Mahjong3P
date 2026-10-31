@@ -21,6 +21,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The training's Python environment (PyTorch ships some JavaScript of its own) and run outputs.
+    "training/.venv/**",
+    "training/runs/**",
   ]),
 ]);
 

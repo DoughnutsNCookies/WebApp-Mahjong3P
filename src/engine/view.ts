@@ -11,6 +11,8 @@ export interface OpponentView {
   bonus: Kind[];
   discardedJokers: number;
   discards: Kind[];
+  /** When each discard was made (see PlayerState.discardAt). */
+  discardAt: number[];
   seat: Seat;
 }
 
@@ -21,6 +23,8 @@ export interface PlayerView {
   phase: Phase;
   turn: number;
   wallLeft: number;
+  /** Discards made so far this round (the clock for `discardAt`). */
+  discardsMade: number;
   hand: Kind[];
   self: PlayerState;
   /** Indexed by player; your own entry is your public info. */
@@ -48,6 +52,7 @@ export function playerView(s: GameState, me: number, { copy = true }: { copy?: b
     phase: s.phase,
     turn: s.turn,
     wallLeft: wallLeft(s),
+    discardsMade: s.discardsMade,
     hand: s.players[me].hand,
     self: s.players[me],
     players: s.players.map((pl, p) => ({
@@ -57,6 +62,7 @@ export function playerView(s: GameState, me: number, { copy = true }: { copy?: b
       bonus: pl.bonus,
       discardedJokers: pl.discardedJokers,
       discards: pl.discards,
+      discardAt: pl.discardAt,
       seat: seatOf(s, p),
     })),
     claimTile: s.phase === 'claim' || s.phase === 'robKong' ? s.pending!.tile : null,

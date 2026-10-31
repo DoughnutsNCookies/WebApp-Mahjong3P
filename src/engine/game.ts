@@ -20,6 +20,8 @@ export interface PlayerState {
   discardedJokers: number;
   /** Tiles discarded to the table that nobody took. Discarded jokers are counted in `discardedJokers`. */
   discards: Kind[];
+  /** For each entry in `discards`, how many discards had been made before it (the table's order, public). */
+  discardAt: number[];
 }
 
 export type Phase = 'opening' | 'turn' | 'claim' | 'robKong' | 'ended';
@@ -147,7 +149,7 @@ export function newRound(seed: number, dealer = 0, rules: Rules = DEFAULT_RULES)
     rules, seed, dealer,
     wall: shuffle(fullSet(), makeRng(seed)),
     head: 0, tail: 84,
-    players: [0, 1, 2].map(() => ({ hand: [], melds: [], bonus: [], discardedJokers: 0, discards: [] })),
+    players: [0, 1, 2].map(() => ({ hand: [], melds: [], bonus: [], discardedJokers: 0, discards: [], discardAt: [] })),
     phase: 'turn', turn: dealer, turnDrew: true, lastDrawn: null, chain: [], lastDrawWasLast: false,
     lastDrawer: dealer, kongMoney: [0, 0, 0], discardsMade: 0, pending: null, result: null, actions: [], events: [],
   };
@@ -413,6 +415,7 @@ function doTurnAction(s: GameState, a: Action) {
   if (a.type === 'discard') {
     removeTiles(pl.hand, a.tile, 1);
     pl.discards.push(a.tile);
+    pl.discardAt.push(s.discardsMade);
     s.discardsMade++;
     return openClaims(s, a.player, a.tile);
   }
@@ -515,7 +518,7 @@ function resolvePending(s: GameState) {
   // Claim on a discard.
   const tile = pend.tile;
   const discarder = s.players[pend.from];
-  const takeDiscard = () => discarder.discards.pop();
+  const takeDiscard = () => { discarder.discardAt.pop(); return discarder.discards.pop(); };
 
   const win = chosen(['win']);
   if (win) {

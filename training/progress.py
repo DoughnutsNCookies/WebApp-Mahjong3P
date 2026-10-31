@@ -283,6 +283,8 @@ hit.addEventListener('mouseleave', () => {{ tip.style.display = 'none'; cross.se
 # v1 is a chain: each run started from the one before, so their times add up. (The long run actually
 # started from the trial's best point, about 0.4 h in, so v1's later times are slightly generous.)
 LINES = [
+    {"name": "v3", "runs": ["v3"], "cls": "s3",
+     "about": "v3: also reads the opponents (danger per tile, early and recent discards, tiles they let go); started from v2n's final version"},
     {"name": "v2", "runs": ["v2trial", "v2", "v2k", "v2n"], "cls": "s1",
      "about": "v2: also sees the analyzer's hand-reading (hints); started from zero; v2k = from 02:47 with kong money; v2n = overnight from 03:45"},
     {"name": "v1", "runs": ["pilot", "pilot2", "main"], "cls": "s2",
@@ -408,10 +410,10 @@ def build_compare() -> Path:
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Mahjong AI: v1 vs v2</title>
 <style>
 .viz-root {{ color-scheme: light; --surface-1:#fcfcfb; --surface-2:#f3f2ee; --line:#d9d7cf; --text-primary:#0b0b0b;
-  --text-secondary:#52514e; --muted:#8a8880; --series-1:#2a78d6; --series-2:#eb6834; }}
+  --text-secondary:#52514e; --muted:#8a8880; --series-1:#2a78d6; --series-2:#eb6834; --series-3:#1baf7a; }}
 @media (prefers-color-scheme: dark) {{ :root:where(:not([data-theme="light"])) .viz-root {{ color-scheme: dark;
   --surface-1:#1a1a19; --surface-2:#232321; --line:#3a3936; --text-primary:#f0efec; --text-secondary:#c3c2b7; --muted:#8f8d85;
-  --series-1:#3987e5; --series-2:#d95926; }} }}
+  --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70; }} }}
 body {{ margin:0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }}
 .viz-root {{ background:var(--surface-1); color:var(--text-primary); min-height:100vh; padding:20px; box-sizing:border-box; }}
 main {{ max-width:900px; margin:0 auto; }} h1 {{ font-family: Georgia, serif; font-size:1.5rem; margin:0 0 4px; }}
@@ -420,12 +422,12 @@ h2 {{ font-family: Georgia, serif; font-size:1.1rem; margin:24px 0 8px; }} .sub 
 .chart-wrap {{ position:relative; }} .chart {{ width:100%; height:auto; display:block; }}
 .grid {{ stroke:var(--line); }} .tick {{ fill:var(--text-secondary); font-size:11px; }} .ref {{ stroke:var(--muted); stroke-width:1.5; }}
 .dash {{ stroke-dasharray:5 4; }} .lab {{ fill:var(--text-secondary); font-size:12px; }} .val {{ fill:var(--text-primary); font-size:12px; font-weight:600; }}
-.line {{ fill:none; stroke-width:2; stroke-linejoin:round; }} .line.s1 {{ stroke:var(--series-1); }} .line.s2 {{ stroke:var(--series-2); }}
-.dot {{ opacity:.35; }} .dot.s1, .end.s1 {{ fill:var(--series-1); }} .dot.s2, .end.s2 {{ fill:var(--series-2); }} .end {{ stroke:var(--surface-1); stroke-width:2; }}
-.handover {{ stroke-dasharray:2 4; stroke-width:1; opacity:.6; }} .handover.s1 {{ stroke:var(--series-1); }} .handover.s2 {{ stroke:var(--series-2); }}
+.line {{ fill:none; stroke-width:2; stroke-linejoin:round; }} .line.s1 {{ stroke:var(--series-1); }} .line.s2 {{ stroke:var(--series-2); }} .line.s3 {{ stroke:var(--series-3); }}
+.dot {{ opacity:.35; }} .dot.s1, .end.s1 {{ fill:var(--series-1); }} .dot.s2, .end.s2 {{ fill:var(--series-2); }} .dot.s3, .end.s3 {{ fill:var(--series-3); }} .end {{ stroke:var(--surface-1); stroke-width:2; }}
+.handover {{ stroke-dasharray:2 4; stroke-width:1; opacity:.6; }} .handover.s1 {{ stroke:var(--series-1); }} .handover.s2 {{ stroke:var(--series-2); }} .handover.s3 {{ stroke:var(--series-3); }}
 .cross {{ stroke:var(--text-secondary); }}
 .legend {{ display:flex; gap:18px; font-size:.85rem; color:var(--text-secondary); flex-wrap:wrap; margin:4px 0 6px; }}
-.key {{ display:inline-block; width:18px; height:3px; vertical-align:middle; margin-right:6px; }} .key.s1 {{ background:var(--series-1); }} .key.s2 {{ background:var(--series-2); }}
+.key {{ display:inline-block; width:18px; height:3px; vertical-align:middle; margin-right:6px; }} .key.s1 {{ background:var(--series-1); }} .key.s2 {{ background:var(--series-2); }} .key.s3 {{ background:var(--series-3); }}
 #tip {{ position:absolute; pointer-events:none; background:var(--surface-1); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:.8rem; display:none; white-space:nowrap; }}
 table {{ border-collapse:collapse; width:100%; font-size:.85rem; font-variant-numeric:tabular-nums; }} td,th {{ border-bottom:1px solid var(--line); padding:5px 6px; text-align:left; vertical-align:top; }}
 ul, dl {{ font-size:.9rem; }} .foot {{ color:var(--muted); font-size:.8rem; margin-top:24px; }}

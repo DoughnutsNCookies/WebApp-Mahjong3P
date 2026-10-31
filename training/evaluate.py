@@ -21,14 +21,16 @@ RM_PER_UNIT = 4.00  # one reward unit is a 10-fan hand value at RM0.20/fan (10 x
 
 
 V1_OBS = 369  # models trained before the hints were added
+V2_OBS = 431  # v2: view + hints; v3 adds the opponent reading after them
 
 
 def evaluate(policy, deals: int = 300, bots: str = "normal", envs: int = 64, seed: int = 7, hints: bool = True,
-             stats_file: str | None = None) -> dict:
+             opp: bool = False, stats_file: str | None = None) -> dict:
     """policy(obs, mask) -> action slots. Returns mean RM per round and a 95% margin."""
     per_deal = np.zeros(deals)
     rounds = 0
-    with GameServer(envs, ["ai", bots, bots], seed=seed, eval_deals=deals, hints=hints, stats_file=stats_file) as srv:
+    with GameServer(envs, ["ai", bots, bots], seed=seed, eval_deals=deals, hints=hints, opp=opp,
+                    stats_file=stats_file) as srv:
         while True:
             b = srv.read()
             for env, deal, ai_seat, r0, r1, r2 in b.done:
@@ -74,7 +76,8 @@ def main():
         policy = model_policy(model, device)
 
     hints = args.random or ck["obs"] != V1_OBS
-    r = evaluate(policy, args.deals, args.bots, seed=args.seed, hints=hints, stats_file=args.stats_file)
+    opp = not args.random and ck["obs"] > V2_OBS
+    r = evaluate(policy, args.deals, args.bots, seed=args.seed, hints=hints, opp=opp, stats_file=args.stats_file)
     print(f"{r['rounds']} rounds vs two {args.bots} bots: {r['rm_per_round']:+.2f} RM/round +/- {r['margin']:.2f}")
     if args.json:
         args.json.write_text(json.dumps(r))

@@ -43,3 +43,18 @@ class PolicyValue(nn.Module):
         action = logits.argmax(-1) if greedy else dist.sample()
         value = self.value(obs, priv) if priv is not None else None
         return action, dist.log_prob(action), value
+
+
+def load_widened(model: PolicyValue, state: dict, old_obs: int, new_obs: int) -> None:
+    """Loads a network trained on fewer inputs into a wider one (v2 into v3). The new inputs come after the
+    old ones and start with zero weight, so the network plays exactly as before until training teaches it
+    to use them."""
+    state = dict(state)
+    target = model.state_dict()
+    for key, has_priv in (("actor.0.0.weight", False), ("critic.0.0.weight", True)):
+        w, new = state[key], torch.zeros_like(target[key])
+        new[:, :old_obs] = w[:, :old_obs]
+        if has_priv:  # the coach's hidden-information inputs sit after the view
+            new[:, new_obs:] = w[:, old_obs:]
+        state[key] = new
+    model.load_state_dict(state)

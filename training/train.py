@@ -32,7 +32,7 @@ import torch
 from torch import nn
 
 from mj_env import GameServer
-from model import PolicyValue
+from model import load_widened, PolicyValue
 from safety import clear_stop, Watchdog, wait_if_paused
 
 HERE = Path(__file__).resolve().parent
@@ -44,6 +44,7 @@ def parse(argv=None):
     ap.add_argument("--dry-run", type=float, default=0, help="seconds of play with no learning, to measure speed")
     ap.add_argument("--run", default="main")
     ap.add_argument("--init-from", type=Path, help="start from this checkpoint's network (new runs only)")
+    ap.add_argument("--opp", action="store_true", help="v3: also give the AI the opponent reading (a v2 --init-from is widened)")
     ap.add_argument("--servers", type=int, default=16, help="game server processes (CPU cores used for games)")
     ap.add_argument("--envs", type=int, default=192, help="rounds running at once per server")
     ap.add_argument("--bot-servers", type=int, default=4, help="extra servers where the AI plays real bots")
@@ -229,8 +230,9 @@ def main(argv=None):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     rng = np.random.default_rng(int(time.time()))
     # Self-play servers, plus a few where the AI sits with real bots (what the benchmark measures).
-    makers = [lambda: GameServer(args.envs, ["ai", "ai", "ai"], seed=int(rng.integers(1, 2**31)))] * args.servers
-    makers += [lambda: GameServer(args.bot_envs, ["ai", args.bot_level, args.bot_level], seed=int(rng.integers(1, 2**31)))] * args.bot_servers
+    makers = [lambda: GameServer(args.envs, ["ai", "ai", "ai"], seed=int(rng.integers(1, 2**31)), opp=args.opp)] * args.servers
+    makers += [lambda: GameServer(args.bot_envs, ["ai", args.bot_level, args.bot_level], seed=int(rng.integers(1, 2**31)),
+                                  opp=args.opp)] * args.bot_servers
     servers = [make() for make in makers]
     selfplay = [True] * args.servers + [False] * args.bot_servers
     # One reader thread per server: whichever servers are ready get their moves, so no server (e.g. one
@@ -273,8 +275,14 @@ def main(argv=None):
             update = ck["update"]
             print(f"resumed at update {update}", flush=True)
         elif args.init_from:
-            model.load_state_dict(torch.load(args.init_from, map_location=device)["model"])
-            print(f"started from {args.init_from}", flush=True)
+            ck = torch.load(args.init_from, map_location=device)
+            if ck["obs"] < sizes["obs"]:
+                load_widened(model, ck["model"], ck["obs"], sizes["obs"])
+                print(f"started from {args.init_from}, widened from {ck['obs']} to {sizes['obs']} inputs "
+                      "(the new ones start at zero)", flush=True)
+            else:
+                model.load_state_dict(ck["model"])
+                print(f"started from {args.init_from}", flush=True)
 
     def save(path):
         torch.save({"model": model.state_dict(), "opt": opt.state_dict(), "update": update, **sizes}, path)

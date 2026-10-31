@@ -10,7 +10,7 @@
 //   41    Joker Opening Slam
 
 // Direct module imports (not the index files): faster in the training server's hot path under tsx.
-import { liveCounts } from '../analyzer/analyze';
+import { dangerTo, dotsOnlyLook, liveCounts, opponentThreats } from '../analyzer/analyze';
 import { afterClaim } from '../analyzer/claims';
 import { inputFromView } from '../analyzer/inputs';
 import { shanten, shantenOfCounts } from '../analyzer/shanten';
@@ -225,6 +225,54 @@ export function encodeHints(v: PlayerView, out: Float32Array, at = 0) {
       if (after) out[i + j] = 1 - shNorm(shanten(after.hand, after.melds.length).best);
     });
   }
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Opponent reading (v3): what each opponent's play says about their hand. v2 attacked well but dealt in
+// as often as the normal bot; these inputs are for defence. Built from the player's own view only: the
+// table's discard order is public.
+//
+// Per opponent (next player, then previous), for each kind:
+//   danger        the analyzer's risk of discarding it to them (their threat level x how well it fits)
+//   early         they threw it among their first 6 discards (a tile they never wanted)
+//   threw         they threw it recently (1 = just now, fading over 24 discards): likely safe now
+//   passed        someone else threw it recently and they let it go: they probably can't pong or win on it
+// then their threat level and whether they look to be on an all-dots hand.
+
+const RECENT = 24;
+const recency = (ago: number) => Math.max(0, 1 - ago / RECENT);
+
+export const OPP = 2 * (KINDS * 4 + 2);
+
+export function encodeOpponents(v: PlayerView, out: Float32Array, at = 0) {
+  out.fill(0, at, at + OPP);
+  const input = inputFromView(v);
+  const live = liveCounts(input);
+  const threats = opponentThreats(input);
+  let i = at;
+  for (const r of [1, 2]) {
+    const p = (v.me + r) % 3;
+    const o = v.players[p];
+    const oi = input.opponents.find((x) => x.player === p)!;
+    const th = threats.find((x) => x.player === p)!;
+    for (let k = 0; k < KINDS; k++) out[i + k * 4] = dangerTo(oi, k, live, th);
+    o.discards.forEach((t, j) => {
+      if (t >= KINDS) return;
+      if (j < 6) out[i + t * 4 + 1] = 1;
+      out[i + t * 4 + 2] = Math.max(out[i + t * 4 + 2], recency(v.discardsMade - 1 - o.discardAt[j]));
+    });
+    // Tiles still on the table were passed by everyone, so by this opponent too.
+    for (let q = 0; q < 3; q++) {
+      if (q === p) continue;
+      v.players[q].discards.forEach((t, j) => {
+        if (t < KINDS) out[i + t * 4 + 3] = Math.max(out[i + t * 4 + 3], recency(v.discardsMade - 1 - v.players[q].discardAt[j]));
+      });
+    }
+    i += KINDS * 4;
+    out[i++] = th.level;
+    out[i++] = dotsOnlyLook(oi) ? 1 : 0;
+  }
+  if (i - at !== OPP) throw new Error(`Opponent block size mismatch: wrote ${i - at}, expected ${OPP}`);
 }
 
 // ---------------------------------------------------------------------------------------------------

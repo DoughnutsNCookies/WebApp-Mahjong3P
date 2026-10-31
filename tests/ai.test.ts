@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { analyze, inputFromView } from '../src/analyzer';
-import { ACTIONS, actionSlot, encodeHints, encodePrivileged, encodeView, HINTS, OBS, PRIV, slotActions } from '../src/ai/encode';
+import { ACTIONS, actionSlot, encodeHints, encodeOpponents, encodePrivileged, encodeView, HINTS, OBS, OPP, PRIV, slotActions } from '../src/ai/encode';
 import { applyActionInPlace, legalActions, makeRng, newRound, playerView, waitingFor } from '../src/engine';
 
 describe('AI encoding', () => {
@@ -118,11 +118,59 @@ describe('AI encoding', () => {
     expect(Array.from(b)).toEqual(Array.from(a));
   });
 
+  it('opponent reading (v3) is in range, tracks the discard order, and uses only the player view', () => {
+    const rng = makeRng(21);
+    const o = new Float32Array(OPP);
+    let checked = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const g = newRound(seed, seed % 3);
+      while (g.phase !== 'ended') {
+        // The engine keeps one timestamp per tile on the table, earlier ones first.
+        for (const pl of g.players) {
+          expect(pl.discardAt.length).toBe(pl.discards.length);
+          for (let j = 1; j < pl.discardAt.length; j++) expect(pl.discardAt[j]).toBeGreaterThan(pl.discardAt[j - 1]);
+        }
+        const p = waitingFor(g)[0];
+        encodeOpponents(playerView(g, p), o);
+        let bad = 0;
+        for (const x of o) if (!(x >= 0 && x <= 1)) bad++;
+        expect(bad).toBe(0);
+        checked++;
+        const legal = legalActions(g, p);
+        applyActionInPlace(g, legal[Math.floor(rng() * legal.length)]);
+      }
+    }
+    expect(checked).toBeGreaterThan(1000);
+
+    // Play until a discard is passed by everyone, then read it from the next player's seat.
+    const g = newRound(4, 0);
+    const first = g.players[0].hand.find((t) => t < 16)!;
+    applyActionInPlace(g, { type: 'discard', player: 0, tile: first });
+    while (g.phase === 'claim') applyActionInPlace(g, { type: 'pass', player: waitingFor(g)[0] });
+    expect(g.players[0].discards).toEqual([first]);
+    encodeOpponents(playerView(g, 1), o); // player 0 is player 1's previous player: the second block
+    const prev = 16 * 4 + 2;
+    expect(o[prev + first * 4 + 1]).toBe(1); // thrown early by player 0
+    expect(o[prev + first * 4 + 2]).toBe(1); // just now
+    expect(o[first * 4 + 3]).toBe(1); // player 2 (the next player) let it go
+
+    // Built from the view: other players' hidden tiles change nothing.
+    const a = new Float32Array(OPP);
+    const b = new Float32Array(OPP);
+    encodeOpponents(playerView(g, 1), a);
+    const altered = structuredClone(g);
+    [altered.players[0].hand, altered.players[2].hand] = [altered.players[2].hand, altered.players[0].hand];
+    altered.wall.reverse();
+    encodeOpponents(playerView(altered, 1), b);
+    expect(Array.from(b)).toEqual(Array.from(a));
+  });
+
   it('has the documented sizes', () => {
     expect(ACTIONS).toBe(42);
     // Changing the observation makes old trained models unusable: update this on purpose only.
     expect(OBS).toBe(369);
     expect(PRIV).toBe(71);
     expect(HINTS).toBe(62);
+    expect(OPP).toBe(132);
   });
 });

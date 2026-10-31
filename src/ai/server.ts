@@ -21,14 +21,16 @@ import { botAction, BotLevel } from '../bots';
 import {
   applyActionInPlace, DEFAULT_RULES, GameState, handValue, makeRng, newRound, playerView, PlayerView, waitingFor,
 } from '../engine';
-import { ACTIONS, encodeHints, encodePrivileged, encodeView, HINTS, OBS as VIEW, PRIV, slotActions } from './encode';
+import { ACTIONS, encodeHints, encodeOpponents, encodePrivileged, encodeView, HINTS, OBS as VIEW, OPP, PRIV, slotActions } from './encode';
 
 type Seat = 'ai' | BotLevel;
-interface Config { envs: number; seats: Seat[]; seed: number; evalDeals?: number; hints?: boolean; statsFile?: string }
+interface Config { envs: number; seats: Seat[]; seed: number; evalDeals?: number; hints?: boolean; opp?: boolean; statsFile?: string }
 
-const cfg: Config = { envs: 64, seats: ['ai', 'ai', 'ai'], seed: 1, hints: true, ...JSON.parse(process.argv[2] ?? '{}') };
-// v2 models also see the analyzer's hints; v1 models (369 numbers) are served with hints: false.
-const OBS = VIEW + (cfg.hints ? HINTS : 0);
+const cfg: Config = { envs: 64, seats: ['ai', 'ai', 'ai'], seed: 1, hints: true, opp: false, ...JSON.parse(process.argv[2] ?? '{}') };
+// v1 models see the view only (369 numbers, hints: false); v2 adds the analyzer's hints (431);
+// v3 adds the opponent reading after them (563, opp: true).
+if (cfg.opp && !cfg.hints) throw new Error('opp needs hints (the opponent block comes after the hints)');
+const OBS = VIEW + (cfg.hints ? HINTS : 0) + (cfg.opp ? OPP : 0);
 const rng = makeRng(cfg.seed);
 const scale = handValue(10, DEFAULT_RULES);
 
@@ -117,6 +119,7 @@ function sendFrame() {
   pending.forEach((d, i) => {
     encodeView(d.view, obs, i * OBS);
     if (cfg.hints) encodeHints(d.view, obs, i * OBS + VIEW);
+    if (cfg.opp) encodeOpponents(d.view, obs, i * OBS + VIEW + HINTS);
   });
   Buffer.from(obs.buffer).copy(buf, o);
   o += obs.byteLength;

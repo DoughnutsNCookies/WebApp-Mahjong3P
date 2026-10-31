@@ -340,21 +340,30 @@ export function opponentThreats(input: AnalyzerInput): Threat[] {
   });
 }
 
+/** How risky discarding `tile` is against one opponent, 0-1 (their threat level times how likely the tile
+ *  fits a hand like theirs). Used by the safety estimate and by the v3 AI's inputs. */
+export function dangerTo(o: AnalyzerInput['opponents'][number], tile: Kind, live: number[], threat: Threat): number {
+  let danger: number;
+  // live[] counts this tile as yours, so unseen copies elsewhere are exactly live[tile].
+  const unseen = live[tile];
+  if (isHonour(tile)) danger = unseen === 0 ? 0.05 : unseen === 1 ? 0.3 : 0.6;
+  else danger = tile === 0 || tile === 8 ? 0.6 : tile === 1 || tile === 7 ? 0.8 : 1;
+  if (dotsOnlyLook(o)) danger *= isDot(tile) ? 1.3 : 0.5;
+  // No furiten at this table: a tile they threw earlier can still win for them, it's just less likely.
+  if (o.discards.includes(tile)) danger *= 0.4;
+  return Math.min(1, threat.level * danger);
+}
+
+export const dotsOnlyLook = (o: AnalyzerInput['opponents'][number]) =>
+  o.melds.length >= 2 && o.melds.every((m) => isDot(m.slots[0].kind));
+
 function safetyOf(input: AnalyzerInput, tile: Kind, live: number[], th: Threat[]): Safety {
   const reasons: string[] = [];
   let risk = 0;
   for (const o of input.opponents) {
     const t = th.find((x) => x.player === o.player)!;
-    let danger: number;
-    // live[] counts this tile as yours, so unseen copies elsewhere are exactly live[tile].
-    const unseen = live[tile];
-    if (isHonour(tile)) danger = unseen === 0 ? 0.05 : unseen === 1 ? 0.3 : 0.6;
-    else danger = tile === 0 || tile === 8 ? 0.6 : tile === 1 || tile === 7 ? 0.8 : 1;
-    const dotsOnly = o.melds.length >= 2 && o.melds.every((m) => isDot(m.slots[0].kind));
-    if (dotsOnly) danger *= isDot(tile) ? 1.3 : 0.5;
-    // No furiten at this table: a tile they threw earlier can still win for them, it's just less likely.
-    if (o.discards.includes(tile)) danger *= 0.4;
-    const r = Math.min(1, t.level * danger);
+    const dotsOnly = dotsOnlyLook(o);
+    const r = dangerTo(o, tile, live, t);
     if (r > risk) risk = r;
     if (r >= 0.3) {
       const why = [o.discards.includes(tile) ? 'they discarded it before' : '', dotsOnly && isDot(tile) ? 'they look to be on dots' : '']
