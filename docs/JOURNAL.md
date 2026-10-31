@@ -128,9 +128,19 @@ deals in about one round in five. That points to v3.
   engine (with the wall empty, an all-fei hand now ends the round as a draw), and the trainer now reports
   and restarts any game server that dies (tested by killing one mid-run).
 
+### The overnight run, v2n
+
+Paired benchmark (same 1,000 deals) of v2k: best **+0.52 ± 0.18**, final **+0.48 ± 0.18**. Its +0.65 at the
+stop came from different deals that suited it.
+
+v2n continued from v2k's final version at 03:45, the first run with the all-fei fix (so the easy-bot
+opponents stayed up all night), with no target and a 3-hour patience stop. It stopped itself at 07:35
+after 3,165 updates. Its regular checks bounced between +0.28 and +1.10 with no clear trend after the
+first hour. Paired: best **+0.60 ± 0.19**, final **+0.71 ± 0.19**, the best result so far but improving
+slowly: v2 has largely levelled off, which is the case for v3.
+
 ## Next
 
-- Run the paired benchmark on v2k's best and final versions (the same 1,000 deals as above).
 - **v3: opponent-aware hints** for defence: for each possible discard, whether it gives an opponent a
   pong, kong or win; whether that opponent already threw the tile; a danger rating; plus each opponent's
   discard order, early versus late discards, and claims they passed on. Built on top of v2k's best
