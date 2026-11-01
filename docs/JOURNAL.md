@@ -195,6 +195,15 @@ The stronger fixed opponent we actually have is the trained AI itself: a **`froz
 AI (public/ai/, v2n) sit as an opponent in training (`--bot-level frozen`) and as a yardstick
 (`evaluate.py --bots frozen`). It beats the normal bot by RM0.7-1.0 a round and costs less to run.
 
+### Sparring against itself (v2f)
+
+From v2n, with the four bot servers and the practice checks playing against the frozen game AI (v2n) instead
+of easy and normal bots: a tougher opponent and a yardstick that can't saturate (0.00 = level with v2n).
+3.2 h, 1,783 updates, stopped by the patience rule. Seventeen checks against frozen v2n ranged from -0.09 to
++0.18, averaging about +0.06; the final version tests **-0.00 +/- 0.17** against v2n head to head and
++0.72 / +0.70 against normal bots (v2n: +0.71 / +0.97). So the plateau is real, not an artefact of the
+bot yardstick: this design, at this size and training budget, has settled at v2n's level.
+
 ## Next
 
 - **v3: opponent-aware hints** for defence: for each possible discard, whether it gives an opponent a
