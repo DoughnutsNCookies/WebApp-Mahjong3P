@@ -8,7 +8,7 @@ import { JOKER, Kind, loserFan, Meld, PlayerView, SEAT_NAMES } from '../engine';
 import { FanChip } from './FanChip';
 import type { Callout, Happening, RiverTile } from './feed';
 import { Tile, TileBack } from './Tile';
-import { rmShort } from './format';
+import { Money } from './Money';
 
 interface Props {
   view: PlayerView;
@@ -143,7 +143,7 @@ export function Table({ view, names, tally, revealed, active, winner, winTile, r
           {thinking?.includes(p) && <Thinking />}
           <span className="seat">{SEAT_NAMES[o.seat]}{p === view.dealer ? ' · dealer' : ''}</span>
           <FanChip fan={f.fan} items={f.items} hiddenNote={!revealed} />
-          {tally && <span className={`money ${tally[p] < 0 ? 'neg' : ''}`}>{rmShort(tally[p])}</span>}
+          {tally && <Money value={tally[p]} />}
         </header>
         <Zone label={revealed ? 'Hand' : `Hand (${side})`}>
           {revealed ? <RevealedHand tiles={revealed[p]} winTile={winner === p ? winTile : null} /> : <TileBack count={o.handSize} />}
@@ -170,7 +170,7 @@ export function Table({ view, names, tally, revealed, active, winner, winTile, r
           {winner === me && <Seal />}
           <span className="seat">{SEAT_NAMES[view.seat]}{me === view.dealer ? ' · dealer' : ''}</span>
           <FanChip fan={mine.fan} items={mine.items} />
-          {tally && <span className={`money ${tally[me] < 0 ? 'neg' : ''}`}>{rmShort(tally[me])}</span>}
+          {tally && <Money value={tally[me]} />}
         </header>
         <River tiles={riverOf(me)} names={names} newest={lastDiscard?.player === me ? lastDiscard.index : undefined} />
         <MeldRow melds={view.self.melds} freshLast={freshSet(me)} />

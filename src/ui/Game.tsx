@@ -2,13 +2,14 @@
 
 // Live play: the table, your hand, your actions, claims, the hint and the end-of-round result.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { analyze, claimAdvice, inputFromView } from '../analyzer';
 import { Action, GameState, JOKER, Kind, playerView, waitingFor } from '../engine';
 import { actionLabel } from './format';
 import { BonusLegend } from './BonusLegend';
 import { Caption, latestHappening, riversOf, useCallouts, winningTile } from './feed';
 import { FxLayer } from './Fx';
+import { playSound } from './sound';
 import type { Settings } from './storage';
 import { ClaimHint, HintPanel } from './Hint';
 import { ResultPanel } from './Result';
@@ -71,6 +72,19 @@ export function Game({ game, names, levels, tally, settings, onAct, onNext, onRe
   const winTile = useMemo(() => winningTile(game), [game]);
   const rivers = useMemo(() => riversOf(game), [game]);
   const callouts = useCallouts(game);
+
+  // Coins whenever money changes hands (kong money, the round's result): more coins for more money, falling
+  // when it's yours going out.
+  const lastTally = useRef(tally.join());
+  useEffect(() => {
+    const before = lastTally.current.split(',').map(Number);
+    lastTally.current = tally.join();
+    const moved = tally.map((x, p) => x - before[p]);
+    const biggest = Math.max(...moved.map(Math.abs));
+    if (!biggest) return;
+    const coins = Math.min(10, Math.max(2, Math.ceil(biggest / 40)));
+    playSound('coins', moved[0] < 0 ? -coins : coins);
+  }, [tally]);
   // "Bot 1 · normal" is just "Bot 1" in the caption, so it fits on a phone line.
   const shortNames = useMemo(() => names.map((n) => n.split(' · ')[0]), [names]);
 

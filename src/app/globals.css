@@ -556,3 +556,12 @@ html[data-theme="macau"] .menu-title { -webkit-text-stroke: 1px #5a3408; }
 /* Phone top bar: the small fei home button only (no title, no lanterns), and tab labels on one line. */
 .tab { white-space: nowrap; }
 @media (max-width: 520px) { .home-title { display: none; } html[data-theme="macau"] .lanterns { display: none; } }
+
+/* Money rolls to its new value; the change floats up from it. */
+.money { position: relative; display: inline-block; }
+.money-delta { position: absolute; right: 0; bottom: 100%; font-size: 0.8em; font-weight: 800; white-space: nowrap; pointer-events: none;
+  color: var(--green); text-shadow: 0 1px 0 var(--panel); opacity: 0; animation: money-float 1.6s var(--ease-out) forwards; }
+.money-delta.neg { color: var(--red); }
+@keyframes money-float { 0% { opacity: 0; translate: 0 6px; } 15% { opacity: 1; translate: 0 0; } 70% { opacity: 1; } 100% { opacity: 0; translate: 0 -14px; } }
+@media (prefers-reduced-motion: reduce) { .money-delta { animation: money-fade 1.6s linear forwards; } }
+@keyframes money-fade { 0%, 100% { opacity: 0; } 15%, 70% { opacity: 1; } }

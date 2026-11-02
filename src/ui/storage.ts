@@ -36,6 +36,8 @@ export interface MatchState {
   tally: number[];
   rounds: number;
   dealer: number;
+  /** The round whose result is already in the tally (so live money isn't counted twice). */
+  lastSeed?: number;
 }
 
 export const NEW_MATCH: MatchState = { tally: [0, 0, 0], rounds: 0, dealer: 0 };

@@ -4,7 +4,7 @@
 
 import { useEffect } from 'react';
 import { setMusic } from './music';
-import { setSoundEnabled } from './sound';
+import { playSound, setSoundEnabled } from './sound';
 import type { Settings } from './storage';
 
 const BAR = { ink: { day: '#f3eee3', night: '#15130f' }, macau: { day: '#17603f', night: '#0a2e20' } };
@@ -27,5 +27,16 @@ export function useLook(s: Settings) {
   }, [s.theme, s.night, s.effects]);
 
   useEffect(() => setSoundEnabled(s.sound), [s.sound]);
+
+  // A sound for everything you press: a click for picking up a tile in your hand, a soft thud for the rest.
+  useEffect(() => {
+    const onPress = (e: PointerEvent) => {
+      const el = (e.target as Element | null)?.closest('button, select, summary, input[type="checkbox"]');
+      if (!el || (el as HTMLButtonElement).disabled) return;
+      playSound(el.matches('button.tile') ? 'pick' : 'tap');
+    };
+    document.addEventListener('pointerdown', onPress, { capture: true });
+    return () => document.removeEventListener('pointerdown', onPress, { capture: true });
+  }, []);
   useEffect(() => setMusic(s.music), [s.music]);
 }

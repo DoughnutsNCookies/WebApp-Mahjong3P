@@ -35,6 +35,7 @@ function loadInitial() {
   }
   // A round that had already ended before a refresh was already counted.
   const recorded = game?.phase === 'ended' ? `${game.seed}` : null;
+  if (game && recorded) match.lastSeed = game.seed;
   game ??= newRound(randomSeed(), match.dealer, rulesFor(settings.unitSen));
   return { settings, match, game, recorded };
 }
@@ -88,7 +89,7 @@ export function useMatch() {
     recorded.current = `${game.seed}`;
     const r = game.result!;
     setMatch((m) => {
-      const next = { tally: m.tally.map((x, p) => x + r.total[p]), rounds: m.rounds + 1, dealer: r.nextDealer };
+      const next = { tally: m.tally.map((x, p) => x + r.total[p]), rounds: m.rounds + 1, dealer: r.nextDealer, lastSeed: game.seed };
       saveMatch(next);
       return next;
     });
@@ -116,10 +117,16 @@ export function useMatch() {
   }, []);
 
   const resetTally = useCallback(() => {
-    const m = { ...NEW_MATCH, dealer: match.dealer };
+    const m = { ...NEW_MATCH, dealer: match.dealer, lastSeed: game?.phase === 'ended' ? game.seed : match.lastSeed };
     setMatch(m);
     saveMatch(m);
-  }, [match.dealer]);
+  }, [match.dealer, match.lastSeed, game]);
 
-  return { settings, setSettings, match, resetTally, game, act, nextRound, aiStatus, aiError: ai.error };
+  // Everyone's money as it stands right now: kong money is paid the moment a kong is made, and a round's
+  // result counts as soon as it ends (before it is saved into the tally, so nothing dips or double-counts).
+  const liveTally = !game || match.lastSeed === game.seed
+    ? match.tally
+    : match.tally.map((x, p) => x + (game.phase === 'ended' ? game.result!.total[p] : game.kongMoney[p]));
+
+  return { settings, setSettings, match, liveTally, resetTally, game, act, nextRound, aiStatus, aiError: ai.error };
 }

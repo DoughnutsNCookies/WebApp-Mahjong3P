@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { JOKER } from '../engine';
 import { Game } from './Game';
 import { Hands } from './Hands';
-import { levelName, rmShort } from './format';
+import { levelName } from './format';
+import { Money } from './Money';
 import { Menu } from './Menu';
 import { Review } from './Review';
 import { SettingsPanel } from './SettingsPanel';
@@ -53,7 +54,7 @@ export function App() {
             {text}
           </button>
         ))}
-        <span className={`money ${m.match.tally[0] < 0 ? 'neg' : ''}`} title="Your running tally">{rmShort(m.match.tally[0])}</span>
+        <Money value={m.liveTally[0]} title="Your running tally" />
       </nav>
 
       <main>
@@ -67,7 +68,7 @@ export function App() {
         {tab === 'play' && !m.game && <p className="muted">Shuffling…</p>}
         {tab === 'play' && m.game && !reviewing && (
           <Game
-            game={m.game} names={names} levels={levels} tally={m.match.tally} settings={m.settings}
+            game={m.game} names={names} levels={levels} tally={m.liveTally} settings={m.settings}
             onAct={m.act}
             onNext={m.nextRound}
             onReview={() => setReviewing(true)}
