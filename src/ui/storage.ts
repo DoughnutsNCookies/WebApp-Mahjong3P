@@ -8,6 +8,7 @@ export type Speed = 'slow' | 'normal' | 'fast';
 export type Theme = 'ink' | 'macau';
 export type Night = 'off' | 'on' | 'auto';
 export type Effects = 'full' | 'calm';
+export type Music = 'off' | 'chill' | 'teahouse' | 'upbeat';
 
 /** Who sits in a bot seat: a rule-based bot, or the trained AI (src/ai/web.ts). */
 export type Opponent = BotLevel | 'ai';
@@ -23,10 +24,11 @@ export interface Settings {
   night: Night;
   effects: Effects;
   sound: boolean;
+  music: Music;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  unitSen: 20, levels: ['normal', 'normal'], speed: 'normal', theme: 'ink', night: 'auto', effects: 'full', sound: false,
+  unitSen: 20, levels: ['normal', 'normal'], speed: 'normal', theme: 'ink', night: 'auto', effects: 'full', sound: false, music: 'off',
 };
 
 export interface MatchState {
@@ -77,7 +79,12 @@ function write(key: string, value: unknown) {
   }
 }
 
-export const loadSettings = () => ({ ...DEFAULT_SETTINGS, ...read<Partial<Settings>>(KEYS.settings, {}) });
+export function loadSettings(): Settings {
+  const s = { ...DEFAULT_SETTINGS, ...read<Partial<Settings>>(KEYS.settings, {}) };
+  // Levels no longer offered (advanced, hard) play as normal.
+  s.levels = s.levels.map((l) => (l === 'easy' || l === 'ai' ? l : 'normal')) as Settings['levels'];
+  return s;
+}
 export const saveSettings = (s: Settings) => write(KEYS.settings, s);
 export const loadMatch = () => read<MatchState>(KEYS.match, NEW_MATCH);
 export const saveMatch = (m: MatchState) => write(KEYS.match, m);

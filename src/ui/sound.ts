@@ -10,7 +10,8 @@ export function setSoundEnabled(on: boolean) {
   if (!on || ctx || typeof window === 'undefined') return;
   const start = () => {
     if (!enabled || ctx) return;
-    const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AC) return;
     ctx = new AC();
     window.removeEventListener('pointerdown', start);
   };
@@ -20,7 +21,8 @@ export function setSoundEnabled(on: boolean) {
 /** Starts the audio from a tap the caller is handling (the Settings switch), so the first sound plays now. */
 export function unlockSound() {
   if (!enabled || ctx || typeof window === 'undefined') return;
-  ctx = new (window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+  const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (AC) ctx = new AC();
 }
 
 export function playSound(kind: 'clack' | 'thump' | 'gong', level = 1) {

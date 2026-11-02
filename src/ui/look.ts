@@ -3,6 +3,7 @@
 // before the first paint from layout.tsx; keep the two in step.
 
 import { useEffect } from 'react';
+import { setMusic } from './music';
 import { setSoundEnabled } from './sound';
 import type { Settings } from './storage';
 
@@ -26,4 +27,5 @@ export function useLook(s: Settings) {
   }, [s.theme, s.night, s.effects]);
 
   useEffect(() => setSoundEnabled(s.sound), [s.sound]);
+  useEffect(() => setMusic(s.music), [s.music]);
 }

@@ -1,18 +1,38 @@
 'use client';
 
-import { useState } from 'react';
+import { ChangeEvent, ReactNode, useState } from 'react';
 import { WEB_MODEL } from '../ai/web';
 import { rmShort } from './format';
+import { setMusic, unlockMusic } from './music';
 import { setSoundEnabled, unlockSound } from './sound';
-import { Effects, Night, Opponent, Settings, Speed, Theme } from './storage';
+import { Music, Opponent, Settings } from './storage';
 
+// Easy, Normal and the AI are the opponents that play differently; the other rule-based levels (advanced,
+// hard) exist for benchmarks only and are not offered here.
 const LEVELS: { value: Opponent; text: string }[] = [
   { value: 'easy', text: 'Easy: plays for speed only' },
   { value: 'normal', text: 'Normal: speed, fan and defence' },
-  { value: 'advanced', text: 'Advanced: normal, and may hold out for bigger fan' },
-  { value: 'hard', text: 'Hard: normal, and looks one step further ahead' },
   { value: 'ai', text: `AI ${WEB_MODEL.name}: trained by playing itself` },
 ];
+
+function Group({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="set-group" aria-label={title}>
+      <h3>{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+function Field({ label, children, note }: { label: string; children: ReactNode; note?: ReactNode }) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      {children}
+      {note && <small className="muted">{note}</small>}
+    </label>
+  );
+}
 
 export function SettingsPanel({ settings, onChange, tally, rounds, onResetTally, aiStatus, aiError }: {
   settings: Settings;
@@ -29,90 +49,109 @@ export function SettingsPanel({ settings, onChange, tally, rounds, onResetTally,
     if (Number.isFinite(sen) && sen > 0 && sen <= 100000) onChange({ ...settings, unitSen: sen });
     else setStake((settings.unitSen / 100).toFixed(2));
   };
+  const set = (key: 'speed' | 'theme' | 'night' | 'effects') => (e: ChangeEvent<HTMLSelectElement>) =>
+    onChange({ ...settings, [key]: e.target.value });
 
   return (
     <div className="settings">
       <h2>Settings</h2>
-      <label className="field">
-        <span>Stake per fan (RM)</span>
-        <input
-          inputMode="decimal" value={stake} onChange={(e) => setStake(e.target.value)} onBlur={(e) => saveStake(e.target.value)}
-          aria-describedby="stake-note"
-        />
-        <small id="stake-note" className="muted">
-          5 fan pays RM{(5 * settings.unitSen / 100).toFixed(2)} a share; 10 fan pays double. Applies from the next round.
-        </small>
-      </label>
-      {[0, 1].map((i) => (
-        <label key={i} className="field">
-          <span>Bot {i + 1}</span>
+
+      <Group title="Game">
+        <Field label="Stake per fan (RM)" note={<>5 fan pays RM{(5 * settings.unitSen / 100).toFixed(2)} a share; 10 fan pays double. Applies from the next round.</>}>
+          <input inputMode="decimal" value={stake} onChange={(e) => setStake(e.target.value)} onBlur={(e) => saveStake(e.target.value)} />
+        </Field>
+        <Field label="Bot speed">
+          <select value={settings.speed} onChange={set('speed')}>
+            <option value="slow">Slow</option>
+            <option value="normal">Normal</option>
+            <option value="fast">Fast</option>
+          </select>
+        </Field>
+      </Group>
+
+      <Group title="Opponents">
+        {[0, 1].map((i) => (
+          <Field key={i} label={`Bot ${i + 1}`}>
+            <select
+              value={settings.levels[i]}
+              onChange={(e) => {
+                const levels = [...settings.levels] as Settings['levels'];
+                levels[i] = e.target.value as Opponent;
+                onChange({ ...settings, levels });
+              }}
+            >
+              {LEVELS.map((l) => <option key={l.value} value={l.value}>{l.text}</option>)}
+            </select>
+          </Field>
+        ))}
+        {aiStatus === 'loading' && <p className="muted span">Loading the AI (about 1.5 MB, once)…</p>}
+        {aiStatus === 'failed' && <p className="muted span">The AI couldn&apos;t load ({aiError}), so its seat plays as Normal for now.</p>}
+      </Group>
+
+      <Group title="Table">
+        <Field label="Table style">
+          <select value={settings.theme} onChange={set('theme')}>
+            <option value="ink">Ink and seal 水墨: paper, brush calls, red seal</option>
+            <option value="macau">Macau 澳門: felt, gold calls, coin shower</option>
+          </select>
+        </Field>
+        <Field label="Night mode">
+          <select value={settings.night} onChange={set('night')}>
+            <option value="auto">Match my phone</option>
+            <option value="off">Off (day)</option>
+            <option value="on">On (night)</option>
+          </select>
+        </Field>
+        <Field label="Effects" note="Phones set to reduce motion always get Calm.">
+          <select value={settings.effects} onChange={set('effects')}>
+            <option value="full">Full: shakes, flashes, big calls and wins</option>
+            <option value="calm">Calm: highlights only</option>
+          </select>
+        </Field>
+      </Group>
+
+      <Group title="Sound">
+        <Field label="Sound effects">
           <select
-            value={settings.levels[i]}
+            value={settings.sound ? 'on' : 'off'}
             onChange={(e) => {
-              const levels = [...settings.levels] as Settings['levels'];
-              levels[i] = e.target.value as Opponent;
-              onChange({ ...settings, levels });
+              const sound = e.target.value === 'on';
+              onChange({ ...settings, sound });
+              setSoundEnabled(sound);
+              if (sound) unlockSound(); // inside the tap, so the browser allows it
             }}
           >
-            {LEVELS.map((l) => <option key={l.value} value={l.value}>{l.text}</option>)}
+            <option value="off">Off</option>
+            <option value="on">On: tile clacks, drum for calls, gong for a win</option>
           </select>
-        </label>
-      ))}
-      {aiStatus === 'loading' && <p className="muted">Loading the AI (about 1.5 MB, once)…</p>}
-      {aiStatus === 'failed' && <p className="muted">The AI couldn&apos;t load ({aiError}), so its seat plays as Normal for now.</p>}
-      <label className="field">
-        <span>Table style</span>
-        <select value={settings.theme} onChange={(e) => onChange({ ...settings, theme: e.target.value as Theme })}>
-          <option value="ink">Ink and seal 水墨: paper table, brush calls, red seal</option>
-          <option value="macau">Macau 澳門: felt table, gold calls, coin shower</option>
-        </select>
-      </label>
-      <label className="field">
-        <span>Night mode</span>
-        <select value={settings.night} onChange={(e) => onChange({ ...settings, night: e.target.value as Night })}>
-          <option value="auto">Match my phone</option>
-          <option value="off">Off (day)</option>
-          <option value="on">On (night)</option>
-        </select>
-      </label>
-      <label className="field">
-        <span>Effects</span>
-        <select value={settings.effects} onChange={(e) => onChange({ ...settings, effects: e.target.value as Effects })}>
-          <option value="full">Full: shakes, flashes, big calls and wins</option>
-          <option value="calm">Calm: highlights only</option>
-        </select>
-        <small className="muted">Phones set to reduce motion always get Calm.</small>
-      </label>
-      <label className="field">
-        <span>Sound</span>
-        <select
-          value={settings.sound ? 'on' : 'off'}
-          onChange={(e) => {
-            const sound = e.target.value === 'on';
-            onChange({ ...settings, sound });
-            setSoundEnabled(sound);
-            if (sound) unlockSound(); // inside the tap, so the browser allows it
-          }}
-        >
-          <option value="off">Off</option>
-          <option value="on">On: tile clacks, drum for calls, gong for a win</option>
-        </select>
-      </label>
-      <label className="field">
-        <span>Bot speed</span>
-        <select value={settings.speed} onChange={(e) => onChange({ ...settings, speed: e.target.value as Speed })}>
-          <option value="slow">Slow</option>
-          <option value="normal">Normal</option>
-          <option value="fast">Fast</option>
-        </select>
-      </label>
-      <div className="field">
-        <span>Running tally ({rounds} round{rounds === 1 ? '' : 's'})</span>
-        <p>You {rmShort(tally[0])} · Bot 1 {rmShort(tally[1])} · Bot 2 {rmShort(tally[2])}</p>
-        <button type="button" className="btn small quiet" onClick={() => { if (confirm('Reset the tally to zero?')) onResetTally(); }}>
-          Reset tally
-        </button>
-      </div>
+        </Field>
+        <Field label="Music" note="Played by the game itself on a Chinese pentatonic scale; it never repeats exactly.">
+          <select
+            value={settings.music}
+            onChange={(e) => {
+              const music = e.target.value as Music;
+              onChange({ ...settings, music });
+              setMusic(music);
+              unlockMusic(); // inside the tap
+            }}
+          >
+            <option value="off">Off</option>
+            <option value="chill">Chill 靜: slow plucked strings over a soft drone</option>
+            <option value="teahouse">Teahouse 茶館: plucked strings with a flute</option>
+            <option value="upbeat">Upbeat 熱鬧: quicker, with light percussion</option>
+          </select>
+        </Field>
+      </Group>
+
+      <Group title="Tally">
+        <div className="field span">
+          <span>Running tally ({rounds} round{rounds === 1 ? '' : 's'})</span>
+          <p>You {rmShort(tally[0])} · Bot 1 {rmShort(tally[1])} · Bot 2 {rmShort(tally[2])}</p>
+          <button type="button" className="btn small quiet" onClick={() => { if (confirm('Reset the tally to zero?')) onResetTally(); }}>
+            Reset tally
+          </button>
+        </div>
+      </Group>
     </div>
   );
 }

@@ -83,7 +83,7 @@ main { flex: 1; }
 .btn.primary { background: var(--green-strong); border-color: var(--green-strong); color: #fff; }
 .btn.win { background: var(--red-strong); border-color: var(--red-strong); color: #fff; font-weight: 700; }
 .btn.small { min-height: 36px; padding: 6px 10px; font-size: 0.9rem; }
-.btn.quiet { border-color: transparent; color: var(--muted); }
+.btn.quiet { border-color: transparent; color: var(--panel-muted); }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 .hint-toggle { margin-top: 4px; }
 
@@ -217,9 +217,19 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
 .log-list li > div:first-child { display: flex; justify-content: space-between; gap: 8px; }
 .replay-controls { display: flex; gap: 8px; align-items: center; }
 .replay-controls input { flex: 1; min-height: 36px; }
-.settings .field { display: flex; flex-direction: column; gap: 6px; margin: 14px 0; }
-.settings input, .settings select { min-height: 44px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); max-width: 420px; }
+/* Settings: a centred sheet of groups; two fields to a row on wide screens, one on a phone. */
+.settings { max-width: 820px; margin: 0 auto; }
+.set-group { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 28px; padding: 14px 0 18px; border-top: 1px solid var(--line); }
+.set-group h3 { grid-column: 1 / -1; margin: 0 0 2px; font-size: 0.95rem; }
+.set-group .span { grid-column: 1 / -1; }
+.settings h2 { margin: 14px 0 12px; }
+.settings .field { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; min-width: 0; }
+.settings .field > span { font-size: 0.9rem; }
+.settings input, .settings select { min-height: 44px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--panel-ink); width: 100%; }
+.settings .field small { line-height: 1.35; }
 .settings .field p { margin: 0; }
+.settings .set-group .btn { align-self: flex-start; }
+@media (max-width: 640px) { .set-group { grid-template-columns: 1fr; gap: 4px; } }
 .foot { font-size: 0.78rem; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 20px; }
 
 /* Motion: what just happened at the table. One idea throughout: tiles land on the table, and calls
