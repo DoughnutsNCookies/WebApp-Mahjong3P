@@ -16,7 +16,7 @@ import { rulesFor } from './useMatch';
 
 const VERDICT_LABEL = { best: 'Best', fine: 'Fine', mistake: 'Mistake', 'big mistake': 'Big mistake' } as const;
 const verdictClass = (it: ReviewItem) => (it.kind === 'missedWin' ? 'v-big-mistake' : `v-${it.verdict.replace(' ', '-')}`);
-const verdictText = (it: ReviewItem) => (it.kind === 'missedWin' ? 'Missed win' : VERDICT_LABEL[it.verdict]);
+const verdictText = (it: ReviewItem) => (it.kind === 'missedWin' ? 'Missed win' : `${VERDICT_LABEL[it.verdict]}${it.kind === 'claim' ? ' · take or leave' : ''}`);
 
 /** The verdict and its reasons, with the hand row marked (the analyzer's pick green, yours red). */
 function Item({ item, withHand, onShow }: { item: ReviewItem; withHand?: boolean; onShow?: () => void }) {
@@ -25,6 +25,12 @@ function Item({ item, withHand, onShow }: { item: ReviewItem; withHand?: boolean
       <div className="review-head">
         <span className="chip">{verdictText(item)}</span>
         <span className="muted">Wall {item.wallLeft}</span>
+        {item.claim && (
+          <span>
+            Offered <Tile kind={item.claim.tile} /> · You: <strong>{item.claim.took}</strong>
+            {item.claim.best !== item.claim.took && <> · Analyzer: <strong>{item.claim.best}</strong></>}
+          </span>
+        )}
         {item.played !== undefined && (
           <span>
             You: <Tile kind={item.played} marked={item.verdict === 'mistake' || item.verdict === 'big mistake' ? 'bad' : undefined} />
@@ -99,7 +105,7 @@ export function Review({ seed, dealer, actions, unitSen, names = ['You', 'Bot 1'
   const prev = [...decisions].reverse().find((x) => x.actionIndex < step);
   const next = decisions.find((x) => x.actionIndex > step);
   const counts = items
-    ? (['best', 'fine', 'mistake', 'big mistake'] as const).map((v) => [v, items.filter((x) => x.verdict === v && x.kind === 'discard').length] as const)
+    ? (['best', 'fine', 'mistake', 'big mistake'] as const).map((v) => [v, items.filter((x) => x.verdict === v && x.kind !== 'missedWin').length] as const)
     : [];
 
   const s = states[step];
@@ -120,7 +126,8 @@ export function Review({ seed, dealer, actions, unitSen, names = ['You', 'Bot 1'
       {!items ? <p className="muted">Analysing your play…</p> : (
         <>
           <p className="lead">
-            {items.length === 0 ? 'You made no discards this round.' : counts.map(([v, n]) => `${n} ${VERDICT_LABEL[v].toLowerCase()}`).join(' · ')}
+            {items.length === 0 ? 'You made no decisions to review this round.' : counts.map(([v, n]) => `${n} ${VERDICT_LABEL[v].toLowerCase()}`).join(' · ')}
+            {items.some((x) => x.kind === 'claim') && <span className="muted"> (discards, and tiles offered to you)</span>}
           </p>
 
           <div className="replay-controls">

@@ -1,3 +1,4 @@
+import { botAction } from '../src/bots';
 import { describe, expect, it } from 'vitest';
 import { analyze, AnalyzerInput, inputFromState, inputFromView, liveCounts, reviewRound, shanten, worstMistakes } from '../src/analyzer';
 import {
@@ -247,5 +248,26 @@ describe('in a real game', () => {
     expect(turns).toBeGreaterThan(30);
     console.log(`analyzed ${turns} turns, slowest ${slowest.toFixed(0)} ms`);
     expect(slowest).toBeLessThan(1500);
+  });
+});
+
+describe('review of claim decisions (take it or let it go)', () => {
+  it('judges every discard offered to you, agreeing with the claim advice', { timeout: 60000 }, () => {
+    let claims = 0;
+    let flagged = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      let s = newRound(seed, seed % 3);
+      while (s.phase !== 'ended') { const p = waitingFor(s)[0]; s = applyAction(s, botAction(s, p, p === 0 ? 'easy' : 'normal')); }
+      for (const it of reviewRound(s.seed, s.dealer, s.actions, 0)) {
+        if (it.kind !== 'claim') continue;
+        claims++;
+        expect(it.claim).toBeDefined();
+        // Same choice as the analyzer is always "best"; a different one never is.
+        expect(it.verdict === 'best').toBe(it.claim!.took === it.claim!.best);
+        if (it.verdict !== 'best') { flagged++; expect(it.note.length).toBeGreaterThan(20); }
+      }
+    }
+    expect(claims).toBeGreaterThan(50);
+    expect(flagged).toBeGreaterThan(0); // the easy bot grabs claims the analyzer would leave
   });
 });
