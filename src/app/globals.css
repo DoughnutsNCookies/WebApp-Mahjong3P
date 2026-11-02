@@ -633,9 +633,32 @@ html[data-theme="macau"] .menu-title { -webkit-text-stroke: 1px #5a3408; }
 @media (prefers-reduced-motion: no-preference) { .waiting-note { animation: think 1.4s ease-in-out infinite; } }
 
 /* Online: a timer bar on the box of whoever is deciding against the clock. It drains over the decision's full
-   time, starting part-way if the decision began before the bar appeared. */
-.timer-bar { height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--line) 70%, transparent); overflow: hidden; margin: -2px 0 6px; }
+   time (starting part-way if the decision began before it appeared) and gets more insistent as time runs out:
+   green, shading through yellow and amber to red; from 70% it thickens and pulses with a red glow; in the last
+   12% it shakes and flashes. Every stage is timed from the same start, so they stay in step. */
+.timer-bar { position: relative; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--line) 70%, transparent); margin: -2px 0 6px;
+  --urgent-at: calc(var(--total) * 0.7 + var(--elapsed)); --panic-at: calc(var(--total) * 0.88 + var(--elapsed));
+  animation: timer-grow 0.4s var(--ease-out) var(--urgent-at) forwards, timer-pulse 0.8s ease-in-out var(--urgent-at) infinite; }
 .timer-bar i { display: block; height: 100%; width: 100%; transform-origin: left; border-radius: inherit;
   animation: timer-drain var(--total) linear var(--elapsed) forwards, timer-colour var(--total) linear var(--elapsed) forwards; }
 @keyframes timer-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
-@keyframes timer-colour { 0%, 60% { background: var(--green); } 80% { background: #d39a2f; } 88%, 100% { background: var(--red); } }
+@keyframes timer-colour {
+  0%, 45% { background: #2f9e6a; } 62% { background: #8fb83a; } 72% { background: #e2a62b; }
+  82% { background: #e5702a; } 90%, 100% { background: #d42a2f; }
+}
+/* Urgent: thicker, with a pulsing red glow. */
+@keyframes timer-grow { to { scale: 1 1.7; } }
+@keyframes timer-pulse { 0%, 100% { box-shadow: 0 0 0 0 #d42a2f00; } 50% { box-shadow: 0 0 0 2px #d42a2f55, 0 0 14px #d42a2fcc; } }
+@media (prefers-reduced-motion: no-preference) {
+  /* Panic: it shakes, the pulse keeps going, and the bar flashes. */
+  .timer-bar { animation: timer-grow 0.4s var(--ease-out) var(--urgent-at) forwards, timer-pulse 0.8s ease-in-out var(--urgent-at) infinite,
+    timer-shake 0.14s linear var(--panic-at) infinite; }
+  .timer-bar i { animation: timer-drain var(--total) linear var(--elapsed) forwards, timer-colour var(--total) linear var(--elapsed) forwards,
+    timer-flash 0.32s ease-in-out var(--panic-at) infinite; }
+}
+@keyframes timer-shake { 0%, 100% { translate: 0 0; } 25% { translate: -2px 1px; } 50% { translate: 1px -1px; } 75% { translate: 2px 1px; } }
+@keyframes timer-flash { 0%, 100% { filter: none; } 50% { filter: brightness(1.6) saturate(1.3); } }
+/* The "Your move 5s" countdown pulses in its last seconds. */
+.countdown { display: inline-block; }
+@media (prefers-reduced-motion: no-preference) { .countdown.low { animation: count-pulse 0.5s ease-in-out infinite; } }
+@keyframes count-pulse { 0%, 100% { scale: 1; } 50% { scale: 1.3; } }
