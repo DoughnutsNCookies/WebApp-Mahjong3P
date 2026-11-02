@@ -3,6 +3,7 @@ import {
   Action, applyAction, applyActionInPlace, GameState, isBonus, JOKER, legalActions, makeRng, newRound, parse, playerView, replay,
   waitingFor, wallLeft,
 } from '../src/engine';
+import { botAction } from '../src/bots';
 import { meld } from './helpers';
 
 const sorted = (s: string) => parse(s).sort((a, b) => a - b);
@@ -466,5 +467,60 @@ describe('random games', () => {
       expect(JSON.stringify(replay(seed, dealer, s.actions))).toBe(JSON.stringify(s));
     }
     expect(wins).toBeGreaterThan(0);
+  });
+});
+
+describe('claims are settled as soon as the outcome is certain', () => {
+  // Real claim windows from bot games where one player can win on the discard and another can only pong/chow.
+  function windows() {
+    const found: { s: GameState; winner: number; other: number }[] = [];
+    for (let seed = 1; seed <= 400 && found.length < 12; seed++) {
+      let s = newRound(seed, seed % 3);
+      while (s.phase !== 'ended') {
+        if (s.phase === 'claim' && s.pending!.responses.every((r) => r === null)) {
+          const opts = s.pending!.options;
+          const w = [0, 1, 2].find((q) => opts[q].some((a) => a.type === 'win'));
+          const o = [0, 1, 2].find((q) => q !== w && opts[q].length && !opts[q].some((a) => a.type === 'win'));
+          if (w !== undefined && o !== undefined) found.push({ s, winner: w, other: o });
+        }
+        s = applyAction(s, botAction(s, waitingFor(s)[0], 'normal'));
+      }
+    }
+    return found;
+  }
+  const cases = windows();
+
+  it('found real claim windows to test', () => expect(cases.length).toBeGreaterThan(3));
+
+  it('a declared win ends it at once: the player who could only pong or chow is not asked', () => {
+    for (const { s, winner, other } of cases) {
+      const after = applyAction(s, { type: 'win', player: winner });
+      expect(after.phase).toBe('ended');
+      expect(after.result!.winner).toBe(winner);
+      expect(waitingFor(after)).not.toContain(other);
+    }
+  });
+
+  it('a pong or chow chosen first waits for the player who can win, who then decides', () => {
+    for (const { s, winner, other } of cases) {
+      const claim = s.pending!.options[other].find((a) => a.type !== 'pass')!;
+      const waiting = applyAction(s, claim);
+      expect(waiting.phase).toBe('claim');
+      expect(waitingFor(waiting)).toEqual([winner]);
+      // The winner wins: the pong or chow never happens.
+      expect(applyAction(waiting, { type: 'win', player: winner }).result!.winner).toBe(winner);
+      // The winner passes: the pong or chow goes ahead.
+      const passed = applyAction(waiting, { type: 'pass', player: winner });
+      expect(passed.phase).toBe('turn');
+      expect(passed.turn).toBe(other);
+    }
+  });
+
+  it('old saved hands with answers no longer asked for still replay', () => {
+    const { s, winner, other } = cases[0];
+    const old = [...s.actions, { type: 'win', player: winner } as const, { type: 'pass', player: other } as const];
+    const r = replay(s.seed, s.dealer, old);
+    expect(r.phase).toBe('ended');
+    expect(r.result!.winner).toBe(winner);
   });
 });

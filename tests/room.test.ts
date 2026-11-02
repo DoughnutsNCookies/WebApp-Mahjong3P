@@ -179,4 +179,48 @@ describe('multiplayer room', () => {
     room.handle('A', { t: 'start' });
     expect(room.join('C', 'Late', person())).toMatch(/middle of a game/);
   });
+
+  it('timers: yours always, an opponent only on their turn, never on a claim', () => {
+    let claimSeen = false;
+    for (let seed = 1; seed <= 40 && !claimSeen; seed++) {
+      const deps = fakeDeps(seed);
+      const room = new Room('6666', 'A', deps);
+      const a = person();
+      const b = person();
+      room.join('A', 'Sean', a);
+      room.join('B', 'Ali', b);
+      room.handle('A', { t: 'addBot', seat: 2, level: 'normal' });
+      room.handle('A', { t: 'start' });
+      // Sean (East) moves first: his own bar, and Ali sees Sean's turn bar on Sean's box (Ali's seat 2).
+      expect(a.state.timers[0]).not.toBeNull();
+      expect(b.state.timers[2]).not.toBeNull();
+      expect(b.state.timers[0]).toBeNull();
+      // Play on until both people are deciding on the same discard.
+      for (let guard = 0; guard < 400 && room.phase === 'playing'; guard++) {
+        const g = room.game!;
+        if (g.phase === 'claim') {
+          const deciding = [0, 1].filter((p) => g.pending!.options[p].length && !g.pending!.responses[p]);
+          if (deciding.length === 2) {
+            expect(a.state.timers[0]).not.toBeNull();
+            expect(b.state.timers[0]).not.toBeNull();
+            // Neither sees the other's claim timer: it would give away that they can claim.
+            expect(a.state.timers[1]).toBeNull();
+            expect(b.state.timers[2]).toBeNull();
+            // One answers; the other's deadline keeps running (not reset).
+            const before = b.state.deadline;
+            room.handle('A', { t: 'act', action: { type: 'pass', player: 0 } });
+            if (room.game!.phase === 'claim') expect(b.state.deadline).toBe(before);
+            claimSeen = true;
+            break;
+          }
+        }
+        const mover = [{ id: 'A', c: a }, { id: 'B', c: b }].find((x) => x.c.state.game && legalActions(x.c.state.game, 0).length);
+        if (mover) {
+          const legal = legalActions(mover.c.state.game!, 0);
+          room.handle(mover.id, { t: 'act', action: legal.find((x) => x.type === 'pass') ?? legal[legal.length - 1] });
+        } else deps.advance(TIMING.botTurn);
+      }
+    }
+    expect(claimSeen).toBe(true);
+  });
 });

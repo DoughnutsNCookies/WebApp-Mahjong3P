@@ -65,7 +65,13 @@ export function useRoom(name: string) {
       sock.onmessage = (ev) => {
         const m = JSON.parse(String(ev.data)) as ServerMsg;
         if (m.t === 'welcome') setStatus('online');
-        else if (m.t === 'state') { setRoom(m.room); setLeft(null); }
+        else if (m.t === 'state') {
+          // Line the server's times up with this device's clock (they rarely agree to the second).
+          const shift = Date.now() - m.room.now;
+          const r = m.room;
+          setRoom({ ...r, deadline: r.deadline && r.deadline + shift, timers: r.timers.map((x) => x && { ...x, at: x.at + shift }) });
+          setLeft(null);
+        }
         else if (m.t === 'chat') setChat((c) => [...c.filter((x) => !m.messages.some((y) => y.id === x.id)), ...m.messages].slice(-60));
         else if (m.t === 'emoji') {
           const id = ++emojiId.current;

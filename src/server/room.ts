@@ -45,7 +45,8 @@ export class Room {
   lastActive: number;
   private roundId = 0;
   private timer: unknown = null;
-  private deadline: { seat: number; at: number } | null = null;
+  /** Each person deciding right now: when they run out of time, and how long they had. */
+  private deadlines = new Map<number, { at: number; total: number }>();
   private dropTimers = new Map<string, unknown>();
   private chatId = 0;
 
@@ -249,28 +250,36 @@ export class Room {
     if (people.length && people.every((s) => s.ready && s.conn)) this.startRound();
   }
 
-  /** Who moves next and when: bots (and people a bot is standing in for) after a pause, people by a deadline. */
+  /**
+   * Who moves next and when. Bots (and people a bot is standing in for) move after a pause; every person who
+   * is deciding has their own deadline, which keeps running while others answer the same claim.
+   */
   private schedule() {
     this.deps.clearTimeout(this.timer);
     this.timer = null;
-    this.deadline = null;
     const g = this.game;
-    if (!g || g.phase === 'ended' || this.phase !== 'playing') return;
-    const waiting = waitingFor(g);
-    const auto = waiting.find((p) => { const s = this.seats[p]; return s.kind === 'bot' || (s.kind === 'human' && s.autoplay); });
-    if (auto !== undefined) {
-      this.timer = this.deps.setTimeout(() => this.apply(this.botMove(auto)), g.phase === 'turn' ? TIMING.botTurn : TIMING.botClaim);
+    if (!g || g.phase === 'ended' || this.phase !== 'playing') {
+      this.deadlines.clear();
       return;
     }
-    const person = waiting[0];
-    if (person === undefined) return;
+    const now = this.deps.now();
+    const waiting = waitingFor(g);
+    const isPerson = (p: number) => { const s = this.seats[p]; return s.kind === 'human' && !s.autoplay; };
+    for (const p of [...this.deadlines.keys()]) if (!waiting.includes(p) || !isPerson(p)) this.deadlines.delete(p);
     const ms = g.phase === 'turn' ? TIMING.humanTurn : TIMING.humanClaim;
-    this.deadline = { seat: person, at: this.deps.now() + ms };
-    // Out of time: on a claim, let it go; on a turn, the Normal bot discards for them.
+    for (const p of waiting) if (isPerson(p) && !this.deadlines.has(p)) this.deadlines.set(p, { at: now + ms, total: ms });
+
+    const auto = waiting.find((p) => !isPerson(p));
+    const botAt = auto === undefined ? Infinity : now + (g.phase === 'turn' ? TIMING.botTurn : TIMING.botClaim);
+    const [person, due] = [...this.deadlines.entries()].sort((a, b) => a[1].at - b[1].at)[0] ?? [-1, { at: Infinity }];
+    const at = Math.min(botAt, due.at);
+    if (at === Infinity) return;
     this.timer = this.deps.setTimeout(() => {
+      if (botAt <= due.at) return this.apply(this.botMove(auto!));
+      // Out of time: on a claim, let it go; on a turn, the Normal bot discards for them.
       const pass = legalActions(this.game!, person).find((a) => a.type === 'pass');
       this.apply(this.game!.phase === 'turn' || !pass ? botAction(this.game!, person, 'normal') : pass);
-    }, ms);
+    }, at - now);
   }
 
   private botMove(p: number): Action {
@@ -307,7 +316,13 @@ export class Room {
       tally: relArr(live),
       rounds: this.rounds,
       game: g && seatView(g, viewer, this.roundId),
-      deadline: this.deadline?.seat === viewer ? this.deadline.at : null,
+      deadline: this.deadlines.get(viewer)?.at ?? null,
+      // Timers: your own always; someone else's only on their turn (on a claim it would show they can claim).
+      timers: relArr([0, 1, 2].map((q) => {
+        const d = this.deadlines.get(q);
+        return d && (q === viewer || (g!.phase === 'turn' && g!.turn === q)) ? d : null;
+      })),
+      now: this.deps.now(),
       seed: g && g.phase === 'ended' ? g.seed : null,
       waitingFor: this.phase === 'between'
         ? this.seats.flatMap((s) => (s.kind === 'human' && (!s.ready || !s.conn) ? [s.name + (s.conn ? '' : ' (disconnected)')] : []))

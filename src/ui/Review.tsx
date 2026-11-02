@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { ReviewItem, reviewRound, worstMistakes } from '../analyzer';
-import { Action, applyAction, GameState, Kind, newRound, playerView } from '../engine';
+import { Action, applyLogged, GameState, Kind, newRound, playerView } from '../engine';
 import { latestHappening, riversOf, winningTile } from './feed';
 import { describeAction } from './format';
 import { Table } from './Table';
@@ -83,7 +83,7 @@ export function Review({ seed, dealer, actions, unitSen, names = ['You', 'Bot 1'
   // Every state from the deal to the end, so the slider moves both ways instantly.
   const states = useMemo(() => {
     const out: GameState[] = [newRound(seed, dealer, rulesFor(unitSen))];
-    for (const a of actions) out.push(applyAction(out[out.length - 1], a));
+    for (const a of actions) out.push(applyLogged(out[out.length - 1], a));
     return out;
   }, [seed, dealer, actions, unitSen]);
   const max = states.length - 1;

@@ -212,7 +212,7 @@ function Table({ room, settings, send }: { room: RoomState; settings: Settings; 
         <button type="button" className="btn small quiet" onClick={() => { if (confirm('Leave the room? A bot will take your seat.')) send({ t: 'leave' }); }}>Leave</button>
       </div>
       <Game
-        game={g} names={names} levels={names.slice(1)} tally={room.tally} settings={settings} reportSeed={room.seed}
+        game={g} names={names} levels={names.slice(1)} tally={room.tally} settings={settings} reportSeed={room.seed} timers={room.timers}
         onAct={(action) => send({ t: 'act', action })}
         onNext={() => send({ t: 'next' })}
         onReview={() => setReviewing(true)}

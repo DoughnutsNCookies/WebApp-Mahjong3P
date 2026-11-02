@@ -155,6 +155,8 @@ function onActions(slots: Int32Array) {
   if (slots.length !== pending.length) throw new Error(`Expected ${pending.length} actions, got ${slots.length}`);
   const touched = new Set<Env>();
   pending.forEach((d, i) => {
+    // A claim can be settled by an earlier answer in the same batch (a win): later answers are then moot.
+    if (!waitingFor(d.env.game!).includes(d.player)) return;
     const a = d.slots[slots[i]];
     if (!a) throw new Error(`Illegal slot ${slots[i]} for env ${d.env.id} player ${d.player}`);
     applyActionInPlace(d.env.game!, a);

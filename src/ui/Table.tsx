@@ -3,7 +3,7 @@
 // The table seen from one player's seat: the two opponents on top, your discards, melds, bonus tiles
 // and hand at the bottom. Used for live play and, read-only, for replays.
 
-import { ReactNode } from 'react';
+import { CSSProperties, ReactNode, useState } from 'react';
 import { JOKER, Kind, loserFan, Meld, PlayerView, SEAT_NAMES } from '../engine';
 import { FanChip } from './FanChip';
 import type { Callout, Happening, RiverTile } from './feed';
@@ -30,6 +30,8 @@ interface Props {
   fresh?: Happening | null;
   /** Short call-outs on players' boxes ("Pong!"). */
   callouts?: Callout[];
+  /** Online: a timer bar per player, when they are deciding against the clock. */
+  timers?: ({ at: number; total: number } | null)[];
   /** Bots deciding right now (thinking dots). */
   thinking?: number[];
   /** Your hand row, rendered by the caller (it handles selection and hints). */
@@ -106,6 +108,20 @@ function RevealedHand({ tiles, winTile }: { tiles: Kind[]; winTile?: Kind | null
   );
 }
 
+/**
+ * A bar that drains as a player's time runs out: green, then amber, then red in the last few seconds. Drawn by
+ * CSS from the time left when it appears (keyed by the deadline, so a new decision starts a new bar).
+ */
+function TimerBar({ at, total }: { at: number; total: number }) {
+  const [left] = useState(() => Math.max(0, at - Date.now()));
+  const style = { '--total': `${total}ms`, '--elapsed': `-${total - left}ms` } as CSSProperties;
+  return (
+    <div className="timer-bar" role="timer" aria-label={`${Math.ceil(left / 1000)} seconds left`} style={style}>
+      <i />
+    </div>
+  );
+}
+
 /** The red seal stamped on the winner's box. */
 export function Seal() {
   return <span className="seal" role="img" aria-label="Hu! Winner">胡</span>;
@@ -115,7 +131,8 @@ function Thinking() {
   return <span className="thinking" role="status" aria-label="thinking"><i /><i /><i /></span>;
 }
 
-export function Table({ view, names, tally, revealed, active, winner, winTile, rivers, lastDiscard, fresh, callouts, thinking, hand }: Props) {
+export function Table({ view, names, tally, revealed, active, winner, winTile, rivers, lastDiscard, fresh, callouts, thinking, timers, hand }: Props) {
+  const timer = (p: number) => { const t = timers?.[p]; return t ? <TimerBar key={t.at} at={t.at} total={t.total} /> : null; };
   const riverOf = (p: number): RiverTile[] => rivers?.[p] ?? view.players[p].discards.map((tile) => ({ tile }));
   const me = view.me;
   // Turn order is East -> South -> West: the player after you sits on your right.
@@ -145,6 +162,7 @@ export function Table({ view, names, tally, revealed, active, winner, winTile, r
           <FanChip fan={f.fan} items={f.items} hiddenNote={!revealed} />
           {tally && <Money value={tally[p]} />}
         </header>
+        {timer(p)}
         <Zone label={revealed ? 'Hand' : `Hand (${side})`}>
           {revealed ? <RevealedHand tiles={revealed[p]} winTile={winner === p ? winTile : null} /> : <TileBack count={o.handSize} />}
         </Zone>
@@ -172,6 +190,7 @@ export function Table({ view, names, tally, revealed, active, winner, winTile, r
           <FanChip fan={mine.fan} items={mine.items} />
           {tally && <Money value={tally[me]} />}
         </header>
+        {timer(me)}
         <River tiles={riverOf(me)} names={names} newest={lastDiscard?.player === me ? lastDiscard.index : undefined} />
         <MeldRow melds={view.self.melds} freshLast={freshSet(me)} />
         <BonusRow bonus={view.self.bonus} jokers={view.self.discardedJokers} fresh={freshBonus(me)} />

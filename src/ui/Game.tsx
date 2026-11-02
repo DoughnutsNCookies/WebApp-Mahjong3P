@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { analyze, claimAdvice, inputFromView } from '../analyzer';
-import { Action, GameState, JOKER, Kind, playerView, waitingFor } from '../engine';
+import { Action, GameState, JOKER, Kind, playerView, sameAction, waitingFor } from '../engine';
 import { actionLabel } from './format';
 import { BonusLegend } from './BonusLegend';
 import { Caption, latestHappening, riversOf, useCallouts, winningTile } from './feed';
@@ -55,8 +55,10 @@ function HandRow({ hand, drawn, won, selected, best, yourMove, onTap }: {
   );
 }
 
-export function Game({ game, names, levels, tally, settings, onAct, onNext, onReview, reportSeed }: {
+export function Game({ game, names, levels, tally, settings, onAct, onNext, onReview, reportSeed, timers }: {
   game: GameState;
+  /** Online: a timer bar per seat (you, next, previous), when that player has one. */
+  timers?: ({ at: number; total: number } | null)[];
   /** Online: the round's real seed, shared once it ends (the game state carries a stand-in). */
   reportSeed?: number | null;
   settings: Settings;
@@ -101,7 +103,12 @@ export function Game({ game, names, levels, tally, settings, onAct, onNext, onRe
   }, [game, settings.effects]);
 
   const myTurn = view.phase === 'turn' && view.turn === 0;
-  const prompt = view.phase !== 'turn' && view.phase !== 'ended' && view.legal.length > 0;
+  // You've answered a claim and another player is still deciding (they may win on it): your choice stays
+  // on screen, the other buttons greyed, until it is settled.
+  const myAnswer = (view.phase === 'claim' || view.phase === 'robKong') ? game.pending?.responses[0] ?? null : null;
+  const answered = !!myAnswer && view.legal.length === 0;
+  const prompt = view.phase !== 'turn' && view.phase !== 'ended' && (view.legal.length > 0 || answered);
+  const promptActions = answered ? game.pending!.options[0] : view.legal;
   const input = useMemo(() => inputFromView(view), [view]);
   const analysis = useMemo(() => (hintOpen && myTurn ? analyze(input) : null), [hintOpen, myTurn, input]);
   const advice = useMemo(
@@ -147,6 +154,7 @@ export function Game({ game, names, levels, tally, settings, onAct, onNext, onRe
         lastDiscard={rivers.newest}
         fresh={happening}
         callouts={callouts}
+        timers={timers}
         thinking={view.phase === 'ended' ? [] : waiting}
         hand={
           <HandRow
@@ -178,17 +186,22 @@ export function Game({ game, names, levels, tally, settings, onAct, onNext, onRe
               {view.phase === 'claim' && <>{names[game.pending!.from]} discarded <Tile kind={view.claimTile!} />.</>}
             </p>
             <div className="actions">
-              {view.legal.map((a, i) => (
+              {promptActions.map((a, i) => (
                 <button
                   key={i}
                   type="button"
-                  className={`btn ${a.type === 'win' || a.type === 'openingSlam' ? 'win cta' : a.type === 'pass' ? '' : 'primary cta'}`}
+                  className={answered
+                    ? `btn ${sameAction(a, myAnswer!) ? 'chosen' : ''}`
+                    : `btn ${a.type === 'win' || a.type === 'openingSlam' ? 'win cta' : a.type === 'pass' ? '' : 'primary cta'}`}
+                  disabled={answered}
+                  aria-pressed={answered ? sameAction(a, myAnswer!) : undefined}
                   onClick={() => doAct(a)}
                 >
                   {actionLabel(a, view.claimTile)}{a.type === 'win' && winFan ? ` ${winFan} fan` : ''}
                 </button>
               ))}
             </div>
+            {answered && <p className="waiting-note">Waiting for the other players…</p>}
           </div>
         )}
 

@@ -29,8 +29,12 @@ export interface RoomState {
   rounds: number;
   /** The round as you may see it (you are player 0), or null in the lobby. */
   game: GameState | null;
-  /** When the current decision of yours times out (ms since 1970), if you have one. */
+  /** When the current decision of yours times out (ms since 1970, server clock), if you have one. */
   deadline: number | null;
+  /** Timer bars per seat (relative): yours, and other people's on their turn only. */
+  timers: ({ at: number; total: number } | null)[];
+  /** The server's clock when this was sent, to line up the timers with this device's clock. */
+  now: number;
   /** The round's real seed, once it has ended (for the review, replay and saved hand). */
   seed: number | null;
   /** Between rounds: who the table is waiting for (names). */

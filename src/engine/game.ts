@@ -347,7 +347,7 @@ export function applyActionInPlace(s: GameState, action: Action): void {
     case 'claim':
     case 'robKong':
       s.pending!.responses[action.player] = action;
-      if (waitingFor(s).length === 0) resolvePending(s);
+      if (waitingFor(s).length === 0 || claimDecided(s)) resolvePending(s);
       break;
   }
 }
@@ -471,6 +471,43 @@ function openClaims(s: GameState, from: number, tile: Kind) {
     return;
   }
   draw(s, next(from), 'wall');
+}
+
+const CLAIM_RANK: Partial<Record<Action['type'], number>> = { win: 3, pong: 2, claimKong: 2, chow: 1 };
+
+/**
+ * During a claim, whether the answers so far already settle it: nobody still deciding could beat the best
+ * claim made (a win beats a pong or kong, which beats a chow; between equals the next player in turn wins).
+ * Then the round goes on at once instead of asking players whose answer can no longer matter.
+ */
+function claimDecided(s: GameState): boolean {
+  if (s.phase !== 'claim' && s.phase !== 'robKong') return false;
+  const pend = s.pending!;
+  const order = [next(pend.from), next(next(pend.from))];
+  let best: { rank: number; at: number } | null = null;
+  order.forEach((p, at) => {
+    const r = pend.responses[p];
+    const rank = r ? CLAIM_RANK[r.type] ?? 0 : 0;
+    if (rank > 0 && (!best || rank > best.rank)) best = { rank, at };
+  });
+  if (!best) return false;
+  const b: { rank: number; at: number } = best;
+  return waitingFor(s).every((q) => {
+    const could = Math.max(0, ...s.pending!.options[q].map((a) => CLAIM_RANK[a.type] ?? 0));
+    const at = order.indexOf(q);
+    return could < b.rank || (could === b.rank && at > b.at);
+  });
+}
+
+const RESPONSES: Action['type'][] = ['pass', 'pong', 'chow', 'claimKong', 'win', 'openingSlam'];
+
+/**
+ * Applies a move from a saved hand. Hands saved before claims were settled early (2026-11-03) contain answers
+ * that are no longer asked for (a pass after someone else's win); those are skipped.
+ */
+export function applyLogged(s: GameState, a: Action): GameState {
+  const asked = (s.phase === 'claim' || s.phase === 'robKong' || s.phase === 'opening') && waitingFor(s).includes(a.player);
+  return RESPONSES.includes(a.type) && !asked ? s : applyAction(s, a);
 }
 
 function resolvePending(s: GameState) {
@@ -609,5 +646,5 @@ function finish(s: GameState, result: RoundResult) {
 
 /** Rebuilds a round from its log. */
 export function replay(seed: number, dealer: number, actions: Action[], rules: Rules = DEFAULT_RULES): GameState {
-  return actions.reduce(applyAction, newRound(seed, dealer, rules));
+  return actions.reduce(applyLogged, newRound(seed, dealer, rules));
 }

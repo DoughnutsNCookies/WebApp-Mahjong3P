@@ -34,9 +34,9 @@ await host.page.locator('.table').waitFor({ timeout: 10000 }); await friend.page
 await host.page.locator('.hand-row.your-move').waitFor({ timeout: 10000 });
 // The first tile is never a fei (they sort last, and can't be discarded).
 const t = host.page.locator('.hand-row .tile').first(); await t.evaluate((e) => e.click()); await t.evaluate((e) => e.click());
-// Ali sees Sean's discard (or, if someone claimed it at once, that it was taken).
-await friend.page.locator('.caption', { hasText: /Sean/ }).waitFor({ timeout: 10000 });
-console.log('Ali sees:', (await friend.page.locator('.caption').textContent()).trim());
+// Ali sees Sean's discard in Sean's row (Sean sits on Ali's left), even if someone claimed it at once.
+await friend.page.locator('.opp').first().locator('.zone', { hasText: 'Discards' }).locator('.tile').first().waitFor({ timeout: 10000 });
+console.log('Ali sees Sean\'s discard row:', await friend.page.locator('.opp').first().locator('.zone', { hasText: 'Discards' }).locator('.tile').count(), 'tile(s)');
 const hidden = await friend.page.locator('.opp .tile.back').allTextContents();
 console.log('Ali sees the other hands only as counts:', hidden.join(', '));
 // Chat and emoji.
