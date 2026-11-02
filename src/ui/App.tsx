@@ -7,21 +7,23 @@ import { Hands } from './Hands';
 import { levelName } from './format';
 import { Money } from './Money';
 import { Menu } from './Menu';
+import { Online, roomFromLink } from './online/Online';
 import { Review } from './Review';
 import { SettingsPanel } from './SettingsPanel';
 import { useLook } from './look';
 import { Tile } from './Tile';
 import { useMatch } from './useMatch';
 
-type Tab = 'home' | 'play' | 'hands' | 'settings';
+type Tab = 'home' | 'play' | 'hands' | 'settings' | 'online';
 const TABS: [Tab, string][] = [['play', 'Quick play'], ['hands', 'History'], ['settings', 'Settings']];
 
 // Opening the app shows the menu; a refresh keeps you where you were (kept for this browser tab only).
 const TAB_KEY = 'mj3p.tab';
 const initialTab = (): Tab => {
   try {
+    if (roomFromLink()) return 'online'; // opened from a friend's room link
     const t = sessionStorage.getItem(TAB_KEY);
-    return t === 'play' || t === 'hands' || t === 'settings' ? t : 'home';
+    return t === 'play' || t === 'hands' || t === 'settings' || t === 'online' ? t : 'home';
   } catch {
     return 'home';
   }
@@ -62,7 +64,7 @@ export function App() {
           <Menu
             inRound={!!m.game && m.game.phase !== 'ended' && m.game.actions.length > 0}
             rounds={m.match.rounds} tally={m.match.tally[0]}
-            onPlay={() => setTab('play')} onHistory={() => setTab('hands')} onSettings={() => setTab('settings')}
+            onPlay={() => setTab('play')} onFriends={() => setTab('online')} onHistory={() => setTab('hands')} onSettings={() => setTab('settings')}
           />
         )}
         {tab === 'play' && !m.game && <p className="muted">Shuffling…</p>}
@@ -80,6 +82,7 @@ export function App() {
             onClose={() => setReviewing(false)}
           />
         )}
+        {tab === 'online' && <Online settings={m.settings} onSettings={m.setSettings} onClose={() => setTab('home')} />}
         {tab === 'hands' && <Hands />}
         {tab === 'settings' && (
           <SettingsPanel

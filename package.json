@@ -1,30 +1,35 @@
 {
-    "name":  "mahjong3p",
-    "version":  "0.1.0",
-    "private":  true,
-    "scripts":  {
-                    "dev":  "next dev",
-                    "build":  "next build",
-                    "start":  "next start",
-                    "lint":  "eslint",
-                    "test":  "vitest run",
-                    "typecheck":  "tsc --noEmit",
-                    "ui-check":  "node scripts/ui-check.mjs"
-                },
-    "dependencies":  {
-                         "next":  "16.4.3",
-                         "react":  "19.3.0",
-                         "react-dom":  "19.3.0"
-                     },
-    "devDependencies":  {
-                            "@types/node":  "^24.19.2",
-                            "@types/react":  "^19",
-                            "@types/react-dom":  "^19",
-                            "eslint":  "^9",
-                            "eslint-config-next":  "16.4.3",
-                            "playwright":  "1.51",
-                            "tsx":  "^4.23.15",
-                            "typescript":  "^5",
-                            "vitest":  "^5.0.5"
-                        }
+    "name": "mahjong3p",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "lint": "eslint",
+        "test": "vitest run",
+        "typecheck": "tsc --noEmit",
+        "ui-check": "node scripts/ui-check.mjs",
+        "build:server": "node scripts/build-server.mjs",
+        "server": "node server-dist/server.mjs"
+    },
+    "dependencies": {
+        "next": "16.4.3",
+        "react": "19.3.0",
+        "react-dom": "19.3.0",
+        "ws": "^8.22.1"
+    },
+    "devDependencies": {
+        "@types/node": "^24.19.2",
+        "@types/react": "^19",
+        "@types/react-dom": "^19",
+        "@types/ws": "^8.18.2",
+        "esbuild": "^0.28.2",
+        "eslint": "^9",
+        "eslint-config-next": "16.4.3",
+        "playwright": "1.51",
+        "tsx": "^4.23.15",
+        "typescript": "^5",
+        "vitest": "^5.0.5"
+    }
 }

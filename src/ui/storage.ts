@@ -20,6 +20,8 @@ export interface Settings {
   levels: [Opponent, Opponent];
   speed: Speed;
   /** Table style, night mode (auto follows the phone), big effects, and sound (off until turned on). */
+  /** Your name at online tables. */
+  name: string;
   theme: Theme;
   night: Night;
   effects: Effects;
@@ -28,7 +30,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  unitSen: 20, levels: ['normal', 'normal'], speed: 'normal', theme: 'ink', night: 'auto', effects: 'full', sound: false, music: 'off',
+  unitSen: 20, levels: ['normal', 'normal'], speed: 'normal', name: '', theme: 'ink', night: 'auto', effects: 'full', sound: false, music: 'off',
 };
 
 export interface MatchState {
@@ -56,6 +58,8 @@ export interface SavedRound {
   dealer: number;
   unitSen: number;
   levels: [Opponent, Opponent];
+  /** Online rounds: everyone's name as seen from your seat (you first). */
+  names?: string[];
   actions: Action[];
   /** Short summary for the list. */
   summary: { type: 'win' | 'draw'; winner?: number; fan?: number; myTotal: number };

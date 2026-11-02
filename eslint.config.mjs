@@ -24,6 +24,8 @@ const eslintConfig = defineConfig([
     // The training's Python environment (PyTorch ships some JavaScript of its own) and run outputs.
     "training/.venv/**",
     "training/runs/**",
+    // The bundled multiplayer server (built output).
+    "server-dist/**",
   ]),
 ]);
 

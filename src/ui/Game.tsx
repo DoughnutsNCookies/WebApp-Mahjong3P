@@ -55,8 +55,10 @@ function HandRow({ hand, drawn, won, selected, best, yourMove, onTap }: {
   );
 }
 
-export function Game({ game, names, levels, tally, settings, onAct, onNext, onReview }: {
+export function Game({ game, names, levels, tally, settings, onAct, onNext, onReview, reportSeed }: {
   game: GameState;
+  /** Online: the round's real seed, shared once it ends (the game state carries a stand-in). */
+  reportSeed?: number | null;
   settings: Settings;
   levels: string[];
   names: string[];
@@ -221,7 +223,7 @@ export function Game({ game, names, levels, tally, settings, onAct, onNext, onRe
         {view.phase === 'ended' && game.result && resultFor === game.seed && (
           <ResultPanel
             result={game.result} names={names} onReview={onReview} onNext={onNext}
-            report={{ seed: game.seed, dealer: game.dealer, actions: game.actions, rules: game.rules, levels, date: new Date().toISOString() }}
+            report={{ seed: reportSeed ?? game.seed, dealer: game.dealer, actions: game.actions, rules: game.rules, levels, date: new Date().toISOString() }}
           />
         )}
       </div>

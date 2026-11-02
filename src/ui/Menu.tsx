@@ -49,12 +49,13 @@ function Tile3D({ char, tone, ivory, green, style }: { char: string; tone: 'fei'
   );
 }
 
-export function Menu({ inRound, rounds, tally, onPlay, onHistory, onSettings }: {
+export function Menu({ inRound, rounds, tally, onPlay, onFriends, onHistory, onSettings }: {
   /** A round is under way: the first button continues it. */
   inRound: boolean;
   rounds: number;
   tally: number;
   onPlay: () => void;
+  onFriends: () => void;
   onHistory: () => void;
   onSettings: () => void;
 }) {
@@ -148,6 +149,7 @@ export function Menu({ inRound, rounds, tally, onPlay, onHistory, onSettings }: 
         <p className="menu-sub">Malaysian three-player mahjong · 三人麻將</p>
         <div className="menu-buttons">
           <button type="button" className="btn primary cta" onClick={onPlay}>{inRound ? 'Continue round' : 'Quick play'}</button>
+          <button type="button" className="btn" onClick={onFriends}>Play with friends</button>
           <button type="button" className="btn" onClick={onHistory}>History</button>
           <button type="button" className="btn" onClick={onSettings}>Settings</button>
         </div>

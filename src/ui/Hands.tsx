@@ -13,7 +13,7 @@ import { Tile } from './Tile';
 import { rulesFor } from './useMatch';
 import { latestHappening, riversOf, winningTile } from './feed';
 
-const namesFor = (log: SavedRound) => ['You', `Bot 1 · ${levelName(log.levels[0])}`, `Bot 2 · ${levelName(log.levels[1])}`];
+const namesFor = (log: SavedRound) => log.names ?? ['You', `Bot 1 · ${levelName(log.levels[0])}`, `Bot 2 · ${levelName(log.levels[1])}`];
 
 export function Replay({ log, start = 0, onClose }: { log: SavedRound; start?: number; onClose: () => void }) {
   const names = namesFor(log);

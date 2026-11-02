@@ -57,6 +57,10 @@ export function SettingsPanel({ settings, onChange, tally, rounds, onResetTally,
       <h2>Settings</h2>
 
       <Group title="Game">
+        <Field label="Your name" note="What other players see at online tables.">
+          <input maxLength={20} placeholder="Your name" defaultValue={settings.name}
+            onBlur={(e) => { const name = e.target.value.replace(/\s+/g, ' ').trim().slice(0, 20); if (name !== settings.name) onChange({ ...settings, name }); }} />
+        </Field>
         <Field label="Stake per fan (RM)" note={<>5 fan pays RM{(5 * settings.unitSen / 100).toFixed(2)} a share; 10 fan pays double. Applies from the next round.</>}>
           <input inputMode="decimal" value={stake} onChange={(e) => setStake(e.target.value)} onBlur={(e) => saveStake(e.target.value)} />
         </Field>
