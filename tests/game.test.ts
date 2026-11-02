@@ -524,3 +524,44 @@ describe('claims are settled as soon as the outcome is certain', () => {
     expect(r.result!.winner).toBe(winner);
   });
 });
+describe('two players can both Hu on the same discard (Q4: the next player in turn wins)', () => {
+  // Real positions from easy-bot games where both of the discarder's opponents can win on the tile.
+  function doubleWins() {
+    const found: GameState[] = [];
+    for (let seed = 1; seed <= 800 && found.length < 10; seed++) {
+      let s = newRound(seed, seed % 3);
+      while (s.phase !== 'ended') {
+        if (s.phase === 'claim' && s.pending!.responses.every((r) => r === null)
+          && [0, 1, 2].filter((q) => s.pending!.options[q].some((a) => a.type === 'win')).length === 2) found.push(s);
+        s = applyAction(s, botAction(s, waitingFor(s)[0], 'easy'));
+      }
+    }
+    return found;
+  }
+  const cases = doubleWins();
+  const seats = (s: GameState) => ({ next: (s.pending!.from + 1) % 3, later: (s.pending!.from + 2) % 3 });
+
+  it('found real double-win discards', () => expect(cases.length).toBeGreaterThanOrEqual(5));
+
+  it('the next player declaring first wins at once', () => {
+    for (const s of cases) {
+      const { next } = seats(s);
+      const r = applyAction(s, { type: 'win', player: next });
+      expect(r.phase).toBe('ended');
+      expect(r.result!.winner).toBe(next);
+    }
+  });
+
+  it('the later player declaring first must wait: not first come, first served', () => {
+    for (const s of cases) {
+      const { next, later } = seats(s);
+      const waiting = applyAction(s, { type: 'win', player: later });
+      expect(waiting.phase).toBe('claim');
+      expect(waitingFor(waiting)).toEqual([next]);
+      // The next player also wins: the next player takes it.
+      expect(applyAction(waiting, { type: 'win', player: next }).result!.winner).toBe(next);
+      // The next player lets it go: the later player's win stands.
+      expect(applyAction(waiting, { type: 'pass', player: next }).result!.winner).toBe(later);
+    }
+  });
+});

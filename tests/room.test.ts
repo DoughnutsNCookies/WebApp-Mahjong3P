@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { legalActions, makeRng } from '../src/engine';
+import { botAction } from '../src/bots';
+import { applyAction, legalActions, makeRng, newRound, waitingFor } from '../src/engine';
 import { RoomState, ServerMsg } from '../src/server/protocol';
 import { Deps, Room, TIMING } from '../src/server/room';
 
@@ -222,5 +223,42 @@ describe('multiplayer room', () => {
       }
     }
     expect(claimSeen).toBe(true);
+  });
+
+  it('in a room, when both opponents can Hu on a discard, the next player wins even if the other taps first', () => {
+    // A real double-win discard from bot games, played out in a room of three people.
+    let s = null as unknown as NonNullable<Room['game']>;
+    for (let seed = 1; seed <= 800 && !s; seed++) {
+      let g = newRound(seed, seed % 3);
+      while (g.phase !== 'ended' && !s) {
+        if (g.phase === 'claim' && g.pending!.responses.every((r) => r === null)
+          && [0, 1, 2].filter((q) => g.pending!.options[q].some((a) => a.type === 'win')).length === 2) s = g;
+        else g = applyAction(g, botAction(g, waitingFor(g)[0], 'easy'));
+      }
+    }
+    const deps = fakeDeps(9);
+    const room = new Room('7777', 'A', deps);
+    const conns = { A: person(), B: person(), C: person() };
+    room.join('A', 'Sean', conns.A);
+    room.join('B', 'Ali', conns.B);
+    room.join('C', 'Mei', conns.C);
+    room.handle('A', { t: 'start' });
+    room.game = s; // the double-win moment
+    room.phase = 'playing';
+    const ids = ['A', 'B', 'C'] as const;
+    const next = ids[(s.pending!.from + 1) % 3];
+    const later = ids[(s.pending!.from + 2) % 3];
+    // The later player is quicker: their Hu has to wait for the next player.
+    expect(room.handle(later, { t: 'act', action: { type: 'win', player: 0 } })).toBeNull();
+    expect(room.game!.phase).toBe('claim');
+    // Their screen keeps the choice, waiting (they answered, the round goes on).
+    expect(conns[later].state.game!.pending!.responses[0]?.type).toBe('win');
+    expect(room.handle(next, { t: 'act', action: { type: 'win', player: 0 } })).toBeNull();
+    expect(room.game!.result!.winner).toBe((s.pending!.from + 1) % 3);
+    // Everyone sees the next player as the winner (each from their own seat).
+    for (const id of ids) {
+      const v = conns[id].state;
+      expect(v.seats[v.game!.result!.winner!].name).toBe({ A: 'Sean', B: 'Ali', C: 'Mei' }[next]);
+    }
   });
 });
