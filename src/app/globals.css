@@ -116,6 +116,12 @@ main { flex: 1; }
 .tile.hand .num { font-size: max(9px, calc(var(--hand-w) * 0.26)); top: 2px; right: 3px; }
 .legend { margin: 12px 0; font-size: 0.92rem; }
 .legend summary { cursor: pointer; min-height: 36px; display: flex; align-items: center; color: var(--muted); }
+/* A chevron that turns when open, so it reads as something to tap (flex hides the browser's own marker). */
+.legend summary { gap: 8px; list-style: none; }
+.legend summary::-webkit-details-marker { display: none; }
+.legend summary::before { content: ""; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform 160ms var(--ease-out); flex: none; }
+.legend[open] summary::before { transform: rotate(45deg); }
+.legend summary:hover { color: var(--ink); }
 .legend table { border-collapse: collapse; margin: 6px 0; }
 .legend td, .legend th { padding: 3px 10px 3px 0; text-align: left; }
 .legend tr.yours td:first-child { font-weight: 700; }
