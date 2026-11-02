@@ -65,6 +65,14 @@ export function roundReport(r: ReportInput): string {
       return;
     }
     const verdict = VERDICT[it.verdict];
+    if (it.claim) {
+      // A discard offered to you: what you did with it, and what the analyzer would have done.
+      const from = ['you', 'Bot 1', 'Bot 2'][it.claim.from];
+      const alt2 = it.claim.best !== it.claim.took ? ` analyzer: ${it.claim.best}.` : '';
+      lines.push(`${n + 1}. Wall ${it.wallLeft}: ${format(it.hand)}${melds}, ${from} discarded ${code(it.claim.tile)}, you: ${it.claim.took}.${alt2} [${verdict}]` +
+        (it.verdict === 'best' ? '' : ` ${it.note}`));
+      return;
+    }
     const alt = it.best !== it.played ? ` analyzer: ${code(it.best!)}.` : '';
     lines.push(`${n + 1}. Wall ${it.wallLeft}: ${format(it.hand)}${melds},${drew} played ${code(it.played!)}.${alt} [${verdict}]` +
       (it.verdict === 'best' ? '' : ` ${it.note}`));
