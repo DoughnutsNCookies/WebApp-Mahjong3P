@@ -55,7 +55,7 @@ for (const run of runs) {
   await page.reload();
   await page.getByRole('navigation', { name: 'Main' }).waitFor();
   // The app opens on the main menu; Quick play starts the round.
-  await page.locator('.menu-tile').waitFor();
+  await page.locator('.menu-scene').waitFor({ state: 'attached' });
   await shot('0-menu');
   await page.locator('.menu-buttons .btn').first().click();
   await shot('1-start');

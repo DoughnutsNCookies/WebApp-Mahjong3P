@@ -481,23 +481,69 @@ html[data-effects="full"] .seal { animation-delay: 1.5s; }
 }
 /* Discards someone took for a set or a win: still shown where they were thrown, greyed out. */
 .tile.dim { filter: grayscale(0.85); }
-/* Main menu: a big fei tile breathing (slowly growing and shrinking, with a soft glow), then the ways in. */
-.menu { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 42px 0 24px; }
-.tile.hero { width: 132px; height: 178px; border-radius: 12px; border-width: 2px; }
-.tile.hero .main { font-size: 100px; }
-.tile.hero .sub { display: none; }
-html[data-theme="macau"] .tile.hero { box-shadow: 0 6px 0 #8a6a25; }
-.menu-tile { margin: 18px 0 30px; filter: drop-shadow(0 0 0 transparent); }
-@media (prefers-reduced-motion: no-preference) {
-  .menu-tile { animation: hero-breathe 3.2s ease-in-out infinite; }
-}
-@keyframes hero-breathe {
-  0%, 100% { scale: 1; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--gold) 30%, transparent)); }
-  50% { scale: 1.09; filter: drop-shadow(0 0 26px color-mix(in srgb, var(--gold) 75%, transparent)); }
-}
-.menu-title { font-size: 2rem; margin: 0; }
-html[data-theme="macau"] .menu-title { font-family: "MJ Heavy", "Iowan Old Style", Georgia, serif; color: #f3d27a; }
-.menu-sub { margin: 6px 0 26px; }
-.menu-buttons { display: flex; flex-direction: column; gap: 12px; width: min(320px, 100%); }
-.menu-buttons .btn { min-height: 54px; font-size: 1.1rem; }
-.menu-tally { margin-top: 22px; font-size: 0.92rem; }
+/* Main menu: a 3D scene of big tiles behind everything, the title and buttons dead centre on top.
+   Each tile is a box of six faces (--w x --h x --d); the scene turns by --rx/--ry, set from Menu.tsx. */
+.menu { position: relative; min-height: calc(100dvh - 130px); display: grid; place-items: center; overflow: hidden; margin: 0 -12px; }
+.menu-stage { position: absolute; inset: 0; perspective: 1400px; perspective-origin: 50% 45%; pointer-events: none; touch-action: none; }
+.menu-scene { position: absolute; left: 50%; top: 47%; width: 0; height: 0; transform-style: preserve-3d;
+  transform: rotateX(var(--rx, -8deg)) rotateY(var(--ry, 18deg)); }
+.t3d { --w: min(46vh, 64vw); --h: calc(var(--w) * 1.36); --d: calc(var(--w) * 0.5);
+  position: absolute; width: var(--w); height: var(--h); left: calc(var(--w) / -2); top: calc(var(--h) / -2);
+  transform-style: preserve-3d; transform: translate3d(var(--tx), var(--ty), var(--tz)) rotateZ(var(--rot)) rotateY(calc(var(--rot) * -1.4)); }
+.t3d-red, .t3d-green { --w: min(30vh, 42vw); }
+/* Safari needs its own backface rule, and no filter or blend mode on 3D faces (they flatten the scene). */
+.t3d-face { position: absolute; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+/* The face: ivory, softly shaded, the character deep in it. */
+.t3d-front { inset: 0; border-radius: calc(var(--w) * 0.09); transform: translateZ(calc(var(--d) / 2)); overflow: hidden;
+  background: radial-gradient(120% 90% at 30% 20%, #fffdf6, #f1e8d2 60%, #e3d6b6);
+  box-shadow: inset 0 0 0 calc(var(--w) * 0.012) #d9cba8, inset 0 calc(var(--w) * -0.02) calc(var(--w) * 0.05) #c9b88f66;
+  display: grid; place-items: center; }
+.t3d-front span { font: 900 calc(var(--w) * 0.72)/1 "MJ Heavy", "Noto Serif SC", "Songti SC", serif;
+  text-shadow: 0 calc(var(--w) * 0.006) 0 #ffffffaa, 0 calc(var(--w) * -0.006) calc(var(--w) * 0.01) #00000040; }
+.t3d-fei .t3d-front span { color: #c2571d; }
+.t3d-red .t3d-front span { color: #b3262c; }
+.t3d-green .t3d-front span { color: #1f6b48; }
+/* A soft glint that slides across the face as the scene turns. */
+.t3d-sheen { position: absolute; inset: -20%; pointer-events: none;
+  background: linear-gradient(105deg, transparent calc(var(--glint, 50%) - 22%), #ffffff59 var(--glint, 50%), transparent calc(var(--glint, 50%) + 22%)); }
+.menu-stage { --glint: 50%; }
+/* The back and the edges: like a real tile, ivory on the face side and jade green behind. */
+.t3d-back { inset: 0; border-radius: calc(var(--w) * 0.09); transform: rotateY(180deg) translateZ(calc(var(--d) / 2));
+  background: radial-gradient(120% 90% at 70% 20%, #3f9a6e, #1d6b47 60%, #13513a); }
+.t3d-right, .t3d-left { width: var(--d); height: calc(var(--h) - var(--w) * 0.12); top: calc(var(--w) * 0.06); left: calc((var(--w) - var(--d)) / 2);
+  background: linear-gradient(90deg, #ebe0c4 0 58%, #1d6b47 58% 100%); }
+.t3d-right { transform: rotateY(90deg) translateZ(calc(var(--w) / 2 - 1px)); background: linear-gradient(90deg, #cfc4a8 0 58%, #175a3c 58% 100%); }
+.t3d-left { transform: rotateY(-90deg) translateZ(calc(var(--w) / 2 - 1px)); background: linear-gradient(270deg, #ddd2b6 0 58%, #1b6443 58% 100%); }
+.t3d-top, .t3d-bottom { height: var(--d); width: calc(var(--w) - var(--w) * 0.12); left: calc(var(--w) * 0.06); top: calc((var(--h) - var(--d)) / 2);
+  background: linear-gradient(0deg, #ebe0c4 0 58%, #1d6b47 58% 100%); }
+.t3d-top { transform: rotateX(90deg) translateZ(calc(var(--h) / 2 - 1px)); background: linear-gradient(0deg, #f3e9cf 0 58%, #22744d 58% 100%); }
+.t3d-bottom { transform: rotateX(-90deg) translateZ(calc(var(--h) / 2 - 1px)); background: linear-gradient(180deg, #b8ae94 0 58%, #144f35 58% 100%); }
+/* A soft shadow pool under the scene. */
+.menu-floor { position: absolute; left: 50%; top: 82%; width: min(80vh, 100vw); height: 12vh; translate: -50% -50%; border-radius: 50%;
+  background: radial-gradient(closest-side, #00000038, transparent); filter: blur(6px); }
+html[data-mode="night"] .menu-floor, html[data-theme="macau"] .menu-floor { background: radial-gradient(closest-side, #00000070, transparent); }
+/* A warm halo behind the scene. */
+.menu::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(50% 45% at 50% 46%, color-mix(in srgb, var(--gold) 26%, transparent), transparent 70%); }
+
+/* The front: title and buttons centred over the scene, solid so they read over the tiles. */
+.menu-front { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; text-align: center; width: min(480px, 100%); padding: 0 12px; }
+.menu-buttons { max-width: 360px; }
+.menu-title { margin: 0; white-space: nowrap; font: 900 clamp(2.4rem, 7vw, 3.6rem)/1.05 "MJ Heavy", "Iowan Old Style", Georgia, serif; color: var(--ink);
+  text-shadow: 0 2px 0 var(--paper), 0 0 24px var(--paper), 0 0 48px var(--paper); }
+html[data-theme="macau"] .menu-title { color: #f7d774; text-shadow: 0 3px 0 #7a4a10, 0 0 30px #000a; }
+.menu-sub { margin: 12px 0 26px; padding: 5px 14px; border-radius: 999px; font-weight: 600; color: var(--panel-ink);
+  background: color-mix(in srgb, var(--panel) 90%, transparent); box-shadow: 0 6px 18px #00000030; }
+/* Light titles over the ivory tiles at night: a dark outline glow keeps them readable. */
+html[data-mode="night"]:not([data-theme="macau"]) .menu-title { text-shadow: 0 2px 0 #000, 0 0 3px #000, 0 0 22px #000c, 0 0 44px #0009; }
+html[data-theme="macau"] .menu-title { -webkit-text-stroke: 1px #5a3408; }
+.menu-buttons { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+.menu-buttons .btn { min-height: 58px; font-size: 1.15rem; font-weight: 700; border-width: 2px;
+  box-shadow: 0 10px 28px #0000003d; backdrop-filter: blur(6px); }
+.menu-buttons .btn:not(.primary) { background: color-mix(in srgb, var(--panel) 92%, transparent); }
+.menu-tally { margin: 18px 0 0; padding: 6px 14px; border-radius: 999px; font-size: 0.92rem; color: var(--panel-ink);
+  background: color-mix(in srgb, var(--panel) 88%, transparent); }
+@media (prefers-reduced-motion: reduce) { .t3d-sheen { display: none; } }
+/* Phone top bar: the small fei home button only (no title, no lanterns), and tab labels on one line. */
+.tab { white-space: nowrap; }
+@media (max-width: 520px) { .home-title { display: none; } html[data-theme="macau"] .lanterns { display: none; } }
