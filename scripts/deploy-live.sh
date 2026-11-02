@@ -1,56 +1,81 @@
 #!/usr/bin/env bash
-# Deploys the multiplayer server to its CloudPanel Node.js site, from this PC (Git Bash):
+# Deploys the game to its CloudPanel Node.js site, from this PC (Git Bash):
 #   bash scripts/deploy-live.sh
+# One Node server serves the game's pages and runs the multiplayer rooms (/ws) on the same domain.
+#
 # Reads cloudpanel-live.json (not in git; the repo is public):
-#   { "domain": "<the server's domain>", "user": "<site SSH user>", "host": "<VM address>", "sshPort": 4444,
-#     "appPort": 3300, "origins": "https://mahjong.schuahsolutions.com" }
-# Builds the one-file server, uploads it with the AI's weights, and (re)starts it with pm2 on the server.
-# Rooms live in memory, so a deploy closes every open room: deploy when nobody is playing.
+#   { "domain": "mahjong.schuahsolutions.com", "user": "<site SSH user>", "host": "<VM address>", "sshPort": 4444,
+#     "appPort": 3300 }
+#
+# Builds the game (out/) and the one-file server, uploads both, and swaps the game's files in at once (nobody
+# loads a half-updated game). The server only restarts when its own code changed, so rooms in progress
+# survive a website-only update; a server change closes every open room (rooms live in memory).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 [ -f cloudpanel-live.json ] || { echo "FAILED: cloudpanel-live.json is missing (see docs/MULTIPLAYER.md)." >&2; exit 1; }
 cfg() { node -e "const c=require('./cloudpanel-live.json'); const v=c['$1']; process.stdout.write(v===undefined?'$2':String(v))"; }
-DOMAIN="$(cfg domain '')"; USER_="$(cfg user '')"; HOST="$(cfg host 192.168.100.44)"; SSHPORT="$(cfg sshPort 4444)"
-APPPORT="$(cfg appPort 3300)"; ORIGINS="$(cfg origins https://mahjong.schuahsolutions.com)"
+DOMAIN="$(cfg domain '')"; USER_="$(cfg user '')"; HOST="$(cfg host 192.168.100.44)"; SSHPORT="$(cfg sshPort 4444)"; APPPORT="$(cfg appPort 3300)"
 [ -n "$DOMAIN" ] && [ -n "$USER_" ] || { echo "FAILED: cloudpanel-live.json needs domain and user." >&2; exit 1; }
 APP="/home/$USER_/htdocs/$DOMAIN"
 SSH=(ssh -o BatchMode=yes -p "$SSHPORT" "$USER_@$HOST")
 
-if [ -n "$(git status --porcelain -- src scripts package.json)" ]; then
-  echo "Note: there are uncommitted changes; the server is built from the files as they are now."
+if [ -n "$(git status --porcelain -- src public scripts package.json)" ]; then
+  echo "Note: there are uncommitted changes; deploying the files as they are now (commit $(git rev-parse --short HEAD) + changes)."
 fi
-echo "Building the server..."
-npm run build:server --silent
+echo "Building the game and the server..."
+npm run build --silent >/dev/null
+npm run build:server --silent >/dev/null
 AI_FILE="$(node -e "process.stdout.write(require('./src/ai/web-model.json').file)")"
 cat > server-dist/ecosystem.config.cjs <<EOF
-// pm2 settings for the multiplayer server (written by scripts/deploy-live.sh).
+// pm2 settings for the game's server (written by scripts/deploy-live.sh).
 module.exports = { apps: [{
-  name: 'mahjong-live', script: 'server.mjs', cwd: __dirname,
-  env: { PORT: '$APPPORT', ALLOWED_ORIGINS: '$ORIGINS', AI_MODEL: __dirname + '/ai/$AI_FILE', NODE_ENV: 'production' },
+  name: 'mahjong', script: 'server.mjs', cwd: __dirname,
+  env: { PORT: '$APPPORT', STATIC_DIR: __dirname + '/site', ALLOWED_ORIGINS: 'https://$DOMAIN', AI_MODEL: __dirname + '/site/ai/$AI_FILE', NODE_ENV: 'production' },
   max_memory_restart: '400M',
 }] };
 EOF
+LOCAL_SUM="$(sha256sum server-dist/server.mjs | cut -d' ' -f1)"
 
 echo "Uploading to $DOMAIN..."
-tar -czf - -C server-dist . | "${SSH[@]}" "mkdir -p '$APP' && rm -rf '$APP/ai' && tar -xzf - -C '$APP'"
+# Server files beside the site (server.mjs, ecosystem), and the game into site.new, swapped in below.
+rm -rf deploy-stage && mkdir -p deploy-stage/server
+cp server-dist/server.mjs server-dist/ecosystem.config.cjs deploy-stage/server/
+cp -r out deploy-stage/site.new
+tar -czf - -C deploy-stage . | "${SSH[@]}" "mkdir -p '$APP/incoming' && rm -rf '$APP/incoming'/* && tar -xzf - -C '$APP/incoming'"
+rm -rf deploy-stage
 
-echo "Starting it..."
+echo "Switching over..."
 "${SSH[@]}" bash -s <<EOF
 set -euo pipefail
+cd '$APP'
+REMOTE_SUM="\$(sha256sum server.mjs 2>/dev/null | cut -d' ' -f1 || true)"
+# The game's files: swap the whole folder at once.
+rm -rf site.old
+[ -d site ] && mv site site.old
+mv incoming/site.new site
+cp incoming/server/server.mjs incoming/server/ecosystem.config.cjs .
+rm -rf incoming site.old
+
 NODE_BIN="\$(ls -d "\$HOME"/.nvm/versions/node/v*/bin 2>/dev/null | sort -V | tail -1)"
 [ -n "\$NODE_BIN" ] || { echo "FAILED: no Node.js for this site user (create the site as a Node.js site in CloudPanel)." >&2; exit 1; }
 export PATH="\$NODE_BIN:\$PATH"
-cd '$APP'
 command -v pm2 >/dev/null || npm i -g pm2 --no-audit --no-fund >/dev/null
-if pm2 describe mahjong-live >/dev/null 2>&1; then pm2 reload ecosystem.config.cjs --update-env; else pm2 start ecosystem.config.cjs; fi
+if ! pm2 describe mahjong >/dev/null 2>&1; then
+  pm2 start ecosystem.config.cjs >/dev/null; echo "server started"
+elif [ "\$REMOTE_SUM" != "$LOCAL_SUM" ]; then
+  pm2 reload ecosystem.config.cjs --update-env >/dev/null; echo "server code changed: restarted (open rooms were closed)"
+else
+  echo "server unchanged: not restarted (open rooms carry on)"
+fi
 pm2 save >/dev/null
 CRON="@reboot PATH=\$NODE_BIN:/usr/bin:/bin pm2 resurrect"
 { crontab -l 2>/dev/null | grep -v "pm2 resurrect" || true; echo "\$CRON"; } | crontab -
 sleep 1
-curl -s --max-time 5 http://127.0.0.1:$APPPORT/health
+echo "on the server: \$(curl -s --max-time 5 http://127.0.0.1:$APPPORT/health)"
 EOF
 
-echo "Checking it from the internet..."
-curl -s --max-time 10 "https://$DOMAIN/health" || echo "Not reachable from outside yet (DNS or SSL still to do?)."
-echo "Deployed. The game connects to wss://$DOMAIN/ws"
+echo "Checking from the internet..."
+echo "  game page: HTTP $(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "https://$DOMAIN/")"
+echo "  server:    $(curl -s --max-time 15 "https://$DOMAIN/health")"
+echo "Deployed https://$DOMAIN/"

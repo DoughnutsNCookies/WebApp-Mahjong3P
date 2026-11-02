@@ -24,26 +24,27 @@ empty seats with bots (Easy, Normal or AI v2) and starts. Chat and emoji at the 
 Code: `src/server/` (protocol, room, main), `src/ui/online/` (connection and screens).
 Tests: `tests/room.test.ts` (whole games with a fake clock), `tests/seat.test.ts`.
 
+## One server for the game and the rooms
+
+`mahjong.schuahsolutions.com` is a CloudPanel **Node.js site**: one Node process (`src/server/main.ts`) serves
+the game's pages (the `out/` folder of `npm run build`, deployed as `site/`) and runs the rooms at `/ws`.
+Next's fingerprinted files and the AI's weights are cached for a year; pages are checked every time, so a
+deploy shows at once. Paths can't leave the site folder.
+
 ## Running it locally
 
 ```
-npm run build:server
-PORT=3399 ALLOWED_ORIGINS=http://localhost:3000 npm run server
-npm run dev     # then open http://localhost:3000/?server=ws://localhost:3399/ws
+npm run build && npm run build:server
+PORT=3399 STATIC_DIR=out ALLOWED_ORIGINS=http://localhost:3399 npm run server   # then open http://localhost:3399/
+node scripts/multiplayer-check.mjs <screenshot folder>                         # two browsers, one room
 ```
 
-## The live server (CloudPanel)
+## Deploying
 
-One-time setup, in CloudPanel:
+`bash scripts/deploy-live.sh` (Git Bash) builds the game and the server, uploads both, swaps the game's files in
+at once, and restarts the server only if its code changed (rooms are in memory, so a server change closes
+open rooms; a game-only update doesn't). It reads `cloudpanel-live.json`, which is git-ignored:
+`{ "domain": "mahjong.schuahsolutions.com", "user": "<site SSH user>", "appPort": 3300 }`.
 
-1. **Add Site > Create a Node.js Site**: domain (e.g. the game's domain with a `-live` prefix), the latest
-   LTS Node.js, app port `3300`. Note the site user.
-2. Add this PC's SSH key to the site user (as for the game site).
-3. **DNS**: a proxied record for the domain, like the game's own. **SSL**: as for the game site.
-4. On this PC, create `cloudpanel-live.json` in the repo folder (it is git-ignored):
-   `{ "domain": "...", "user": "...", "appPort": 3300, "origins": "https://mahjong.schuahsolutions.com" }`
-5. `bash scripts/deploy-live.sh`. It ends by fetching `https://<domain>/health`.
-
-The game's address for the server is `LIVE_SERVER` in `src/ui/online/useRoom.ts`.
-
-Later deploys: `bash scripts/deploy-live.sh` (closes open rooms; deploy when nobody is playing).
+One-time setup in CloudPanel: a Node.js site for the domain with app port 3300, this PC's SSH key on the site
+user, SSL as for any site. The address the game uses for rooms is its own (`wss://<domain>/ws`).

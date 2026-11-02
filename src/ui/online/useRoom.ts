@@ -6,11 +6,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatMessage, ClientMsg, RoomState, ServerMsg } from '../../server/protocol';
 
-/** Whether the live server is up: shows Play with friends on the menu. Switch on once it is deployed. */
-export const MULTIPLAYER_LIVE = false;
+/** Whether the game's own server runs the rooms: shows Play with friends on the menu. */
+export const MULTIPLAYER_LIVE = true;
 
-/** The live server. For testing, ?server=ws://localhost:3300/ws on the page address overrides it. */
-const LIVE_SERVER = 'wss://mahjong-live.schuahsolutions.com/ws';
+/** The rooms are on the same server as the game. For testing, ?server=ws://localhost:3300/ws overrides it. */
+const LIVE_SERVER = typeof location === 'undefined' ? '' : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
 
 export function serverUrl(): string {
   try {

@@ -1,7 +1,9 @@
-// The multiplayer server: private rooms over WebSockets. Runs as a CloudPanel Node.js site (see
-// docs/MULTIPLAYER.md), bundled into one file by `npm run build:server`.
+// The game's server: serves the game itself (the static export) and runs the private rooms over WebSockets at
+// /ws, so everything lives on one domain. Runs as a CloudPanel Node.js site (see docs/MULTIPLAYER.md), bundled
+// into one file by `npm run build:server`.
 //
 //   PORT          where to listen (CloudPanel's app port), default 3300
+//   STATIC_DIR    the game's files (the `out/` folder of `npm run build`), default ./site
 //   ALLOWED_ORIGINS  comma-separated page origins allowed to connect (default: the live game and localhost)
 //   AI_MODEL      path to the trained AI's weights (public/ai/<file>); without it AI bots play as Normal
 //
@@ -9,15 +11,18 @@
 
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { resolve } from 'node:path';
 import { WebSocket, WebSocketServer } from 'ws';
 import { parseModel, WEB_MODEL, WebModel } from '../ai/web';
 import { ClientMsg, ServerMsg } from './protocol';
 import { cleanName, Conn, Deps, Room } from './room';
+import { serveStatic } from './static';
 
 const PORT = Number(process.env.PORT ?? 3300);
 const ORIGINS = (process.env.ALLOWED_ORIGINS ?? 'https://mahjong.schuahsolutions.com,http://localhost:3000').split(',').map((s) => s.trim());
 const IDLE_MS = 60 * 60 * 1000;
 const MAX_ROOMS = 500;
+const STATIC_DIR = resolve(process.env.STATIC_DIR ?? 'site');
 
 function loadModel(): WebModel | null {
   const path = process.env.AI_MODEL ?? `public/ai/${WEB_MODEL.file}`;
@@ -56,7 +61,7 @@ const http = createServer((req, res) => {
     res.end(`ok, ${rooms.size} room${rooms.size === 1 ? '' : 's'}, AI ${deps.model ? 'loaded' : 'off'}\n`);
     return;
   }
-  res.writeHead(404).end();
+  if (!serveStatic(STATIC_DIR, req, res)) res.writeHead(req.method === 'GET' || req.method === 'HEAD' ? 404 : 405).end();
 });
 
 const wss = new WebSocketServer({ server: http, path: '/ws', maxPayload: 16 * 1024 });
@@ -156,4 +161,4 @@ setInterval(() => {
   }
 }, 60_000);
 
-http.listen(PORT, () => console.log(`3P Mahjong rooms on port ${PORT}; origins ${ORIGINS.join(', ')}; AI ${deps.model ? 'loaded' : 'off'}`));
+http.listen(PORT, () => console.log(`3P Mahjong on port ${PORT}: game from ${STATIC_DIR}, rooms at /ws; origins ${ORIGINS.join(', ')}; AI ${deps.model ? 'loaded' : 'off'}`));

@@ -59,3 +59,4 @@ __pycache__/
 # multiplayer server bundle (built by npm run build:server) and its deploy settings
 /server-dist/
 cloudpanel-live.json
+/deploy-stage/
