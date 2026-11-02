@@ -204,6 +204,15 @@ of easy and normal bots: a tougher opponent and a yardstick that can't saturate 
 +0.72 / +0.70 against normal bots (v2n: +0.71 / +0.97). So the plateau is real, not an artefact of the
 bot yardstick: this design, at this size and training budget, has settled at v2n's level.
 
+### Multiplayer, 2 November
+
+Private rooms with a 4-digit code or a link; the host fills seats with bots (Easy, Normal, AI v2); chat and
+emoji. The server holds the only real round and sends each person their view of it, relabelled so they are
+player 0 and with every hidden thing removed (other hands, wall, seed, others' claim options, passes and
+draws). A dropped player's seat is played by a bot mid-round; between rounds the table waits for them. The site
+became a CloudPanel Node.js site: one Node server serves the game and runs the rooms at /ws on the same domain,
+deployed with `scripts/deploy-live.sh`. Checked on the live domain with two browsers in one room.
+
 ## Next
 
 - **v3: opponent-aware hints** for defence: for each possible discard, whether it gives an opponent a

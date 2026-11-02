@@ -60,3 +60,4 @@ __pycache__/
 /server-dist/
 cloudpanel-live.json
 /deploy-stage/
+cloudpanel*.json

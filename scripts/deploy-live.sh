@@ -42,7 +42,7 @@ echo "Uploading to $DOMAIN..."
 rm -rf deploy-stage && mkdir -p deploy-stage/server
 cp server-dist/server.mjs server-dist/ecosystem.config.cjs deploy-stage/server/
 cp -r out deploy-stage/site.new
-tar -czf - -C deploy-stage . | "${SSH[@]}" "mkdir -p '$APP/incoming' && rm -rf '$APP/incoming'/* && tar -xzf - -C '$APP/incoming'"
+tar -czf - -C deploy-stage . | "${SSH[@]}" "mkdir -p '$APP/incoming' && rm -rf '$APP/incoming'/* && tar -xmzf - -C '$APP/incoming'"
 rm -rf deploy-stage
 
 echo "Switching over..."
