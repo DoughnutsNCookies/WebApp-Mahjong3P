@@ -44,7 +44,7 @@ node scripts/multiplayer-check.mjs <screenshot folder>                         #
 `bash scripts/deploy-live.sh` (Git Bash) builds the game and the server, uploads both, swaps the game's files in
 at once, and restarts the server only if its code changed (rooms are in memory, so a server change closes
 open rooms; a game-only update doesn't). It reads `cloudpanel-live.json`, which is git-ignored:
-`{ "domain": "mahjong.schuahsolutions.com", "user": "<site SSH user>", "appPort": 3300 }`.
+`{ "domain": "mahjong.schuahsolutions.com", "user": "<site SSH user>", "appPort": 3500 }`.
 
-One-time setup in CloudPanel: a Node.js site for the domain with app port 3300, this PC's SSH key on the site
+One-time setup in CloudPanel: a Node.js site for the domain with app port 3500, this PC's SSH key on the site
 user, SSL as for any site. The address the game uses for rooms is its own (`wss://<domain>/ws`).

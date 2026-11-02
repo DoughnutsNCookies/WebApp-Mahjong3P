@@ -2,7 +2,7 @@
 // /ws, so everything lives on one domain. Runs as a CloudPanel Node.js site (see docs/MULTIPLAYER.md), bundled
 // into one file by `npm run build:server`.
 //
-//   PORT          where to listen (CloudPanel's app port), default 3300
+//   PORT          where to listen (CloudPanel's app port), default 3500 (3200/3201, 3300 and 3400 are the other apps on the VM)
 //   STATIC_DIR    the game's files (the `out/` folder of `npm run build`), default ./site
 //   ALLOWED_ORIGINS  comma-separated page origins allowed to connect (default: the live game and localhost)
 //   AI_MODEL      path to the trained AI's weights (public/ai/<file>); without it AI bots play as Normal
@@ -18,7 +18,7 @@ import { ClientMsg, ServerMsg } from './protocol';
 import { cleanName, Conn, Deps, Room } from './room';
 import { serveStatic } from './static';
 
-const PORT = Number(process.env.PORT ?? 3300);
+const PORT = Number(process.env.PORT ?? 3500);
 const ORIGINS = (process.env.ALLOWED_ORIGINS ?? 'https://mahjong.schuahsolutions.com,http://localhost:3000').split(',').map((s) => s.trim());
 const IDLE_MS = 60 * 60 * 1000;
 const MAX_ROOMS = 500;

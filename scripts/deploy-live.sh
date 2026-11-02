@@ -5,7 +5,7 @@
 #
 # Reads cloudpanel-live.json (not in git; the repo is public):
 #   { "domain": "mahjong.schuahsolutions.com", "user": "<site SSH user>", "host": "<VM address>", "sshPort": 4444,
-#     "appPort": 3300 }
+#     "appPort": 3500 }
 #
 # Builds the game (out/) and the one-file server, uploads both, and swaps the game's files in at once (nobody
 # loads a half-updated game). The server only restarts when its own code changed, so rooms in progress
@@ -15,7 +15,7 @@ cd "$(dirname "$0")/.."
 
 [ -f cloudpanel-live.json ] || { echo "FAILED: cloudpanel-live.json is missing (see docs/MULTIPLAYER.md)." >&2; exit 1; }
 cfg() { node -e "const c=require('./cloudpanel-live.json'); const v=c['$1']; process.stdout.write(v===undefined?'$2':String(v))"; }
-DOMAIN="$(cfg domain '')"; USER_="$(cfg user '')"; HOST="$(cfg host 192.168.100.44)"; SSHPORT="$(cfg sshPort 4444)"; APPPORT="$(cfg appPort 3300)"
+DOMAIN="$(cfg domain '')"; USER_="$(cfg user '')"; HOST="$(cfg host 192.168.100.44)"; SSHPORT="$(cfg sshPort 4444)"; APPPORT="$(cfg appPort 3500)"
 [ -n "$DOMAIN" ] && [ -n "$USER_" ] || { echo "FAILED: cloudpanel-live.json needs domain and user." >&2; exit 1; }
 APP="/home/$USER_/htdocs/$DOMAIN"
 SSH=(ssh -o BatchMode=yes -p "$SSHPORT" "$USER_@$HOST")

@@ -9,7 +9,7 @@ import type { ChatMessage, ClientMsg, RoomState, ServerMsg } from '../../server/
 /** Whether the game's own server runs the rooms: shows Play with friends on the menu. */
 export const MULTIPLAYER_LIVE = true;
 
-/** The rooms are on the same server as the game. For testing, ?server=ws://localhost:3300/ws overrides it. */
+/** The rooms are on the same server as the game. For testing, ?server=ws://localhost:3500/ws overrides it. */
 const LIVE_SERVER = typeof location === 'undefined' ? '' : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
 
 export function serverUrl(): string {
