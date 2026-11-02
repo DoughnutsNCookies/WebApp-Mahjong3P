@@ -332,7 +332,7 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
    =================================================================================================== */
 
 @font-face { font-family: "MJ Brush"; src: url("/fonts/brush-subset.woff2") format("woff2"); font-display: swap; }
-@font-face { font-family: "MJ Heavy"; src: url("/fonts/serif-heavy-subset.woff2") format("woff2"); font-weight: 900; font-display: swap; }
+@font-face { font-family: "MJ Heavy"; src: url("/fonts/serif-heavy-2.woff2") format("woff2"); font-weight: 900; font-display: swap; }
 
 /* Ink at night: a dark inkstone table, the tiles still ivory. */
 html[data-mode="night"] {
@@ -482,50 +482,59 @@ html[data-effects="full"] .seal { animation-delay: 1.5s; }
 /* Discards someone took for a set or a win: still shown where they were thrown, greyed out. */
 .tile.dim { filter: grayscale(0.85); }
 /* Main menu: a 3D scene of big tiles behind everything, the title and buttons dead centre on top.
-   Each tile is a box of six faces (--w x --h x --d); the scene turns by --rx/--ry, set from Menu.tsx. */
+   A tile is a face plus a stack of thin rounded layers behind it (Menu.tsx), so its thickness follows the
+   rounded corners; the scene turns by --rx/--ry, the light by --glint/--spot-*, set every frame. */
 .menu { position: relative; min-height: calc(100dvh - 130px); display: grid; place-items: center; overflow: hidden; margin: 0 -12px; }
-.menu-stage { position: absolute; inset: 0; perspective: 1400px; perspective-origin: 50% 45%; pointer-events: none; touch-action: none; }
-.menu-scene { position: absolute; left: 50%; top: 47%; width: 0; height: 0; transform-style: preserve-3d;
+.menu-stage { position: absolute; inset: 0; perspective: 1500px; perspective-origin: 50% 44%; pointer-events: none; touch-action: none;
+  --glint: 50%; --spot-x: 38%; --spot-y: 30%; --shadow-x: 0px; --shadow-w: 1; }
+.menu-scene { position: absolute; left: 50%; top: 46%; width: 0; height: 0; transform-style: preserve-3d;
   transform: rotateX(var(--rx, -8deg)) rotateY(var(--ry, 18deg)); }
-.t3d { --w: min(46vh, 64vw); --h: calc(var(--w) * 1.36); --d: calc(var(--w) * 0.5);
+.t3d { --w: min(44vh, 62vw); --h: calc(var(--w) * 1.36); --r: calc(var(--w) * 0.085);
   position: absolute; width: var(--w); height: var(--h); left: calc(var(--w) / -2); top: calc(var(--h) / -2);
-  transform-style: preserve-3d; transform: translate3d(var(--tx), var(--ty), var(--tz)) rotateZ(var(--rot)) rotateY(calc(var(--rot) * -1.4)); }
-.t3d-red, .t3d-green { --w: min(30vh, 42vw); }
-/* Safari needs its own backface rule, and no filter or blend mode on 3D faces (they flatten the scene). */
-.t3d-face { position: absolute; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-/* The face: ivory, softly shaded, the character deep in it. */
-.t3d-front { inset: 0; border-radius: calc(var(--w) * 0.09); transform: translateZ(calc(var(--d) / 2)); overflow: hidden;
-  background: radial-gradient(120% 90% at 30% 20%, #fffdf6, #f1e8d2 60%, #e3d6b6);
-  box-shadow: inset 0 0 0 calc(var(--w) * 0.012) #d9cba8, inset 0 calc(var(--w) * -0.02) calc(var(--w) * 0.05) #c9b88f66;
-  display: grid; place-items: center; }
-.t3d-front span { font: 900 calc(var(--w) * 0.72)/1 "MJ Heavy", "Noto Serif SC", "Songti SC", serif;
-  text-shadow: 0 calc(var(--w) * 0.006) 0 #ffffffaa, 0 calc(var(--w) * -0.006) calc(var(--w) * 0.01) #00000040; }
-.t3d-fei .t3d-front span { color: #c2571d; }
-.t3d-red .t3d-front span { color: #b3262c; }
-.t3d-green .t3d-front span { color: #1f6b48; }
-/* A soft glint that slides across the face as the scene turns. */
+  transform-style: preserve-3d; transform: translate3d(var(--tx), var(--ty), var(--tz)) rotateZ(var(--rot)) rotateY(calc(var(--rot) * -1.3)); }
+.t3d-red, .t3d-green { --w: min(29vh, 40vw); }
+@media (prefers-reduced-motion: no-preference) {
+  /* Each tile floats on its own slow rhythm (the translate property composes with the transform). */
+  .t3d { animation: bob var(--bob, 7s) ease-in-out infinite; }
+  .t3d-green { animation-delay: -3s; }
+  .t3d-red { animation-delay: -5s; }
+}
+@keyframes bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 calc(var(--w) * -0.03); } }
+.t3d-layer, .t3d-back, .t3d-front { position: absolute; inset: 0; border-radius: var(--r); }
+/* The stack sits a hair inside the face so no layer ever peeks past its edge. */
+.t3d-layer, .t3d-back { inset: 1px; }
+.t3d-layer { transform: translateZ(var(--z)); }
+/* The back: jade green, a little darker towards the edges, with a faint embossed ring like a real tile. */
+.t3d-back { transform: translateZ(var(--z)); background: radial-gradient(110% 100% at 50% 40%, #2f8f60, #16553b 70%, #0e3d2a);
+  box-shadow: inset 0 0 0 calc(var(--w) * 0.03) #0f45301f; }
+/* The face: ivory with a slight warm vignette and a bevelled rim; the character sits carved into it. */
+.t3d-front { overflow: hidden; display: grid; place-items: center; transform: translateZ(0.5px);
+  background: radial-gradient(130% 100% at 35% 25%, #fffdf5 0%, #f4ecd6 45%, #e7dcbd 100%);
+  box-shadow: inset 0 0 0 1px #ffffffa0, inset calc(var(--w) * 0.012) calc(var(--w) * 0.012) calc(var(--w) * 0.03) #ffffffb0,
+    inset calc(var(--w) * -0.012) calc(var(--w) * -0.012) calc(var(--w) * 0.035) #8d7c5466, inset 0 0 calc(var(--w) * 0.1) #c9b88f40; }
+.t3d-char { position: relative; z-index: 1; font: 900 calc(var(--w) * 0.72)/1 "MJ Heavy", "Noto Serif SC", "Songti SC", serif;
+  /* Engraved: a dark edge towards the light and a pale edge away from it. */
+  text-shadow: calc(var(--w) * -0.004) calc(var(--w) * -0.004) calc(var(--w) * 0.004) #00000073, calc(var(--w) * 0.005) calc(var(--w) * 0.005) 0 #ffffffd0,
+    0 0 calc(var(--w) * 0.02) #00000018; }
+.t3d-fei .t3d-char { color: #c4581c; }
+.t3d-red .t3d-char { color: #b4272d; }
+.t3d-green .t3d-char { color: #1f6b48; }
+/* Bone grain: fine noise, barely there. */
+.t3d-grain { position: absolute; inset: 0; opacity: 0.1; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.38 0 0 0 0 0.25 0 0 0 0.7 0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E"); }
+/* Light: a band of glint that slides across as the scene turns, and a soft highlight spot that follows it. */
 .t3d-sheen { position: absolute; inset: -20%; pointer-events: none;
-  background: linear-gradient(105deg, transparent calc(var(--glint, 50%) - 22%), #ffffff59 var(--glint, 50%), transparent calc(var(--glint, 50%) + 22%)); }
-.menu-stage { --glint: 50%; }
-/* The back and the edges: like a real tile, ivory on the face side and jade green behind. */
-.t3d-back { inset: 0; border-radius: calc(var(--w) * 0.09); transform: rotateY(180deg) translateZ(calc(var(--d) / 2));
-  background: radial-gradient(120% 90% at 70% 20%, #3f9a6e, #1d6b47 60%, #13513a); }
-.t3d-right, .t3d-left { width: var(--d); height: calc(var(--h) - var(--w) * 0.12); top: calc(var(--w) * 0.06); left: calc((var(--w) - var(--d)) / 2);
-  background: linear-gradient(90deg, #ebe0c4 0 58%, #1d6b47 58% 100%); }
-.t3d-right { transform: rotateY(90deg) translateZ(calc(var(--w) / 2 - 1px)); background: linear-gradient(90deg, #cfc4a8 0 58%, #175a3c 58% 100%); }
-.t3d-left { transform: rotateY(-90deg) translateZ(calc(var(--w) / 2 - 1px)); background: linear-gradient(270deg, #ddd2b6 0 58%, #1b6443 58% 100%); }
-.t3d-top, .t3d-bottom { height: var(--d); width: calc(var(--w) - var(--w) * 0.12); left: calc(var(--w) * 0.06); top: calc((var(--h) - var(--d)) / 2);
-  background: linear-gradient(0deg, #ebe0c4 0 58%, #1d6b47 58% 100%); }
-.t3d-top { transform: rotateX(90deg) translateZ(calc(var(--h) / 2 - 1px)); background: linear-gradient(0deg, #f3e9cf 0 58%, #22744d 58% 100%); }
-.t3d-bottom { transform: rotateX(-90deg) translateZ(calc(var(--h) / 2 - 1px)); background: linear-gradient(180deg, #b8ae94 0 58%, #144f35 58% 100%); }
-/* A soft shadow pool under the scene. */
-.menu-floor { position: absolute; left: 50%; top: 82%; width: min(80vh, 100vw); height: 12vh; translate: -50% -50%; border-radius: 50%;
-  background: radial-gradient(closest-side, #00000038, transparent); filter: blur(6px); }
-html[data-mode="night"] .menu-floor, html[data-theme="macau"] .menu-floor { background: radial-gradient(closest-side, #00000070, transparent); }
+  background: linear-gradient(105deg, transparent calc(var(--glint) - 24%), #ffffff66 var(--glint), transparent calc(var(--glint) + 24%)); }
+.t3d-spot { position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(36% 28% at var(--spot-x) var(--spot-y), #ffffff59, transparent 70%); }
+/* The shadow on the floor moves the other way as the scene turns, so the tiles feel lit from one side. */
+.menu-floor { position: absolute; left: 50%; top: 84%; width: min(78vh, 96vw); height: 12vh; border-radius: 50%;
+  translate: calc(-50% + var(--shadow-x)) -50%; scale: var(--shadow-w) 1;
+  background: radial-gradient(closest-side, #00000045, #00000018 50%, transparent); filter: blur(8px); }
+html[data-mode="night"] .menu-floor, html[data-theme="macau"] .menu-floor { background: radial-gradient(closest-side, #00000085, #00000030 50%, transparent); }
 /* A warm halo behind the scene. */
 .menu::before { content: ""; position: absolute; inset: 0; pointer-events: none;
   background: radial-gradient(50% 45% at 50% 46%, color-mix(in srgb, var(--gold) 26%, transparent), transparent 70%); }
-
 /* The front: title and buttons centred over the scene, solid so they read over the tiles. */
 .menu-front { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; text-align: center; width: min(480px, 100%); padding: 0 12px; }
 .menu-buttons { max-width: 360px; }
@@ -543,7 +552,7 @@ html[data-theme="macau"] .menu-title { -webkit-text-stroke: 1px #5a3408; }
 .menu-buttons .btn:not(.primary) { background: color-mix(in srgb, var(--panel) 92%, transparent); }
 .menu-tally { margin: 18px 0 0; padding: 6px 14px; border-radius: 999px; font-size: 0.92rem; color: var(--panel-ink);
   background: color-mix(in srgb, var(--panel) 88%, transparent); }
-@media (prefers-reduced-motion: reduce) { .t3d-sheen { display: none; } }
+@media (prefers-reduced-motion: reduce) { .t3d-sheen, .t3d-spot { display: none; } }
 /* Phone top bar: the small fei home button only (no title, no lanterns), and tab labels on one line. */
 .tab { white-space: nowrap; }
 @media (max-width: 520px) { .home-title { display: none; } html[data-theme="macau"] .lanterns { display: none; } }
