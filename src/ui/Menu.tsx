@@ -10,8 +10,14 @@
 // darker towards the back. Lighting follows the turn: a glint slides across each face and the shadow on the
 // floor moves with the scene.
 
-import { CSSProperties, useEffect, useRef } from 'react';
+import { CSSProperties, useEffect, useRef, useState } from 'react';
+
+/** iPhones only deliver tilt after the person allows it, from a tap (DeviceOrientationEvent.requestPermission). */
+type IOSOrientation = { requestPermission?: () => Promise<'granted' | 'denied'> };
+const tiltNeedsPermission = () =>
+  typeof DeviceOrientationEvent !== 'undefined' && typeof (DeviceOrientationEvent as unknown as IOSOrientation).requestPermission === 'function';
 import { rmShort } from './format';
+import { MULTIPLAYER_LIVE } from './online/useRoom';
 
 const SPACING = 6; // px between layers (fewer layers = smoother on phones; 6px still reads as solid)
 
@@ -60,6 +66,13 @@ export function Menu({ inRound, rounds, tally, onPlay, onFriends, onHistory, onS
   onSettings: () => void;
 }) {
   const stage = useRef<HTMLDivElement>(null);
+  // iPhone: show "Tilt to look around" until motion access is allowed (Android and others need no prompt).
+  const [askTilt, setAskTilt] = useState(() => tiltNeedsPermission() && sessionStorage.getItem('mj3p.tilt') !== 'granted');
+  const enableTilt = () => {
+    (DeviceOrientationEvent as unknown as IOSOrientation).requestPermission?.()
+      .then((r) => { if (r === 'granted') { sessionStorage.setItem('mj3p.tilt', 'granted'); setAskTilt(false); } })
+      .catch(() => setAskTilt(false));
+  };
 
   useEffect(() => {
     const el = stage.current;
@@ -91,6 +104,21 @@ export function Menu({ inRound, rounds, tally, onPlay, onFriends, onHistory, onS
       lastInput = performance.now();
     };
     const onUp = () => { drag = null; };
+    // Tilting the phone turns the scene. Whatever angle it is held at counts as level, and that slowly
+    // follows a change of grip, so it never has to be held a particular way.
+    let level: { b: number; g: number } | null = null;
+    const onTilt = (e: DeviceOrientationEvent) => {
+      if (e.beta === null || e.gamma === null || drag || still) return;
+      // In landscape the phone's axes swap relative to the screen.
+      const angle = (screen.orientation?.angle ?? 0) % 360;
+      const [b, g] = angle === 90 ? [-e.gamma, e.beta] : angle === 270 || angle === -90 ? [e.gamma, -e.beta] : [e.beta, e.gamma];
+      if (!level) level = { b, g };
+      level.b += (b - level.b) * 0.004;
+      level.g += (g - level.g) * 0.004;
+      target.y = Math.max(-40, Math.min(40, (g - level.g) * 1.3));
+      target.x = Math.max(-28, Math.min(28, -(b - level.b) * 0.9));
+      lastInput = performance.now();
+    };
 
     const frame = (t: number) => {
       // Left alone for a few seconds: a slow drift, so the scene is never quite still.
@@ -121,6 +149,7 @@ export function Menu({ inRound, rounds, tally, onPlay, onFriends, onHistory, onS
     addEventListener('pointerdown', onDown);
     addEventListener('pointerup', onUp);
     addEventListener('pointercancel', onUp);
+    addEventListener('deviceorientation', onTilt);
     document.addEventListener('visibilitychange', onVisible);
     raf = requestAnimationFrame(frame);
     return () => {
@@ -129,6 +158,7 @@ export function Menu({ inRound, rounds, tally, onPlay, onFriends, onHistory, onS
       removeEventListener('pointerdown', onDown);
       removeEventListener('pointerup', onUp);
       removeEventListener('pointercancel', onUp);
+      removeEventListener('deviceorientation', onTilt);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
@@ -149,10 +179,13 @@ export function Menu({ inRound, rounds, tally, onPlay, onFriends, onHistory, onS
         <p className="menu-sub">Malaysian three-player mahjong · 三人麻將</p>
         <div className="menu-buttons">
           <button type="button" className="btn primary cta" onClick={onPlay}>{inRound ? 'Continue round' : 'Quick play'}</button>
-          <button type="button" className="btn" onClick={onFriends}>Play with friends</button>
+          {(MULTIPLAYER_LIVE || new URLSearchParams(location.search).has('server')) && (
+            <button type="button" className="btn" onClick={onFriends}>Play with friends</button>
+          )}
           <button type="button" className="btn" onClick={onHistory}>History</button>
           <button type="button" className="btn" onClick={onSettings}>Settings</button>
         </div>
+        {askTilt && <button type="button" className="btn small quiet tilt-btn" onClick={enableTilt}>Tilt to look around</button>}
         {rounds > 0 && (
           <p className="menu-tally">
             {rounds} round{rounds === 1 ? '' : 's'} played · your tally <span className={`money ${tally < 0 ? 'neg' : ''}`}>{rmShort(tally)}</span>

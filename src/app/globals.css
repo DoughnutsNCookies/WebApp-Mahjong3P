@@ -625,3 +625,4 @@ html[data-theme="macau"] .menu-title { -webkit-text-stroke: 1px #5a3408; }
   .emoji-btn { width: 36px; height: 36px; font-size: 1.2rem; }
   .room-strip { font-size: 0.82rem; }
 }
+.tilt-btn { margin-top: 14px; background: color-mix(in srgb, var(--panel) 88%, transparent); color: var(--panel-ink); border-color: var(--line); }

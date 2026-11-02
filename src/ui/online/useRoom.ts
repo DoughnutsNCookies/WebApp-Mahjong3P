@@ -6,6 +6,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatMessage, ClientMsg, RoomState, ServerMsg } from '../../server/protocol';
 
+/** Whether the live server is up: shows Play with friends on the menu. Switch on once it is deployed. */
+export const MULTIPLAYER_LIVE = false;
+
 /** The live server. For testing, ?server=ws://localhost:3300/ws on the page address overrides it. */
 const LIVE_SERVER = 'wss://mahjong-live.schuahsolutions.com/ws';
 
