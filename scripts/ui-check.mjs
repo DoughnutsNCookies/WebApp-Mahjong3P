@@ -54,6 +54,10 @@ for (const run of runs) {
   // Calm: the idle motion (breathing tiles) would make every tap target "not stable" for Playwright.
   await page.reload();
   await page.getByRole('navigation', { name: 'Main' }).waitFor();
+  // The app opens on the main menu; Quick play starts the round.
+  await page.locator('.menu-tile').waitFor();
+  await shot('0-menu');
+  await page.locator('.menu-buttons .btn').first().click();
   await shot('1-start');
   if (run.levels.includes('ai') && !(await page.getByText(/Bot 1 · AI /).count())) fail('Bot 1 is not shown as the AI');
 
@@ -122,7 +126,7 @@ for (const run of runs) {
     await shot('4-review');
     await page.getByRole('button', { name: 'Close' }).click();
 
-    await page.getByRole('button', { name: 'Hands' }).click();
+    await page.getByRole('button', { name: 'History' }).click();
     const replayBtn = page.getByRole('button', { name: 'Replay' }).first();
     if (!(await replayBtn.count())) fail('finished hand was not saved');
     else {

@@ -67,6 +67,11 @@ main { flex: 1; }
 /* Top bar */
 .topbar { display: flex; align-items: center; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--paper); z-index: 2; }
 .topbar h1 { font-size: 1.05rem; margin: 0 auto 0 0; white-space: nowrap; }
+/* The title is the way back to the menu; on a phone just the small fei tile. */
+.home { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; padding: 4px 2px; min-height: 40px; cursor: pointer; font: inherit; color: inherit; }
+.home-mark .tile { pointer-events: none; }
+.home:hover .home-title { text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 520px) { .home-title { display: none; } html[data-theme="macau"] .lanterns { display: none; } }
 .tab { border: 1px solid transparent; background: none; padding: 8px 10px; min-height: 40px; border-radius: 6px; cursor: pointer; }
 .tab.on { border-color: var(--line); background: var(--panel); color: var(--panel-ink); font-weight: 600; }
 .topbar .money { margin-left: 4px; white-space: nowrap; }
@@ -375,8 +380,7 @@ html[data-theme="macau"] .topbar h1 { font-family: "MJ Heavy", "Iowan Old Style"
 /* Macau lanterns beside the title. */
 .lanterns { display: none; gap: 6px; margin-right: 4px; }
 html[data-theme="macau"] .lanterns { display: inline-flex; }
-/* On a phone the lanterns replace the title, so the tabs still fit. */
-@media (max-width: 440px) { html[data-theme="macau"] .topbar h1 { display: none; } html[data-theme="macau"] .lanterns { margin-right: auto; } }
+/* On a phone the home button (a small fei tile) replaces the title and the lanterns: see .home. */
 .lantern { position: relative; width: 18px; height: 23px; border-radius: 45%; background: radial-gradient(circle at 50% 40%, #ff5a3c, #b3141c 70%);
   color: #f3d27a; font: 900 11px/23px "MJ Heavy", serif; text-align: center; transform-origin: 50% -6px; }
 html[data-mode="night"] .lantern { box-shadow: 0 0 14px #ff3a2a99; }
@@ -477,3 +481,23 @@ html[data-effects="full"] .seal { animation-delay: 1.5s; }
 }
 /* Discards someone took for a set or a win: still shown where they were thrown, greyed out. */
 .tile.dim { filter: grayscale(0.85); }
+/* Main menu: a big fei tile breathing (slowly growing and shrinking, with a soft glow), then the ways in. */
+.menu { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 42px 0 24px; }
+.tile.hero { width: 132px; height: 178px; border-radius: 12px; border-width: 2px; }
+.tile.hero .main { font-size: 100px; }
+.tile.hero .sub { display: none; }
+html[data-theme="macau"] .tile.hero { box-shadow: 0 6px 0 #8a6a25; }
+.menu-tile { margin: 18px 0 30px; filter: drop-shadow(0 0 0 transparent); }
+@media (prefers-reduced-motion: no-preference) {
+  .menu-tile { animation: hero-breathe 3.2s ease-in-out infinite; }
+}
+@keyframes hero-breathe {
+  0%, 100% { scale: 1; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--gold) 30%, transparent)); }
+  50% { scale: 1.09; filter: drop-shadow(0 0 26px color-mix(in srgb, var(--gold) 75%, transparent)); }
+}
+.menu-title { font-size: 2rem; margin: 0; }
+html[data-theme="macau"] .menu-title { font-family: "MJ Heavy", "Iowan Old Style", Georgia, serif; color: #f3d27a; }
+.menu-sub { margin: 6px 0 26px; }
+.menu-buttons { display: flex; flex-direction: column; gap: 12px; width: min(320px, 100%); }
+.menu-buttons .btn { min-height: 54px; font-size: 1.1rem; }
+.menu-tally { margin-top: 22px; font-size: 0.92rem; }

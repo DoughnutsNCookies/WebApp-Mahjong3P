@@ -71,7 +71,7 @@ export function label(k: Kind): string {
 
 interface Props {
   kind: Kind;
-  size?: 'hand' | 'small';
+  size?: 'hand' | 'small' | 'hero';
   selected?: boolean;
   /** Ring used by the hint to point at a tile. */
   marked?: 'best' | 'bad';
