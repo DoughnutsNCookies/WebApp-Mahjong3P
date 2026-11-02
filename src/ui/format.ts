@@ -1,4 +1,4 @@
-import { Action, Kind } from '../engine';
+import { Action, GameState, Kind } from '../engine';
 import { WEB_MODEL } from '../ai/web';
 import { label } from './Tile';
 import type { Opponent } from './storage';
@@ -29,4 +29,13 @@ export function actionLabel(a: Action, claimTile?: Kind | null): string {
     case 'discardJoker': return 'Set joker aside (+1 fan)';
     case 'discard': return `Discard ${label(a.tile)}`;
   }
+}
+
+/** One line for a move in a replay or review, e.g. "Bot 1 discards 5 dot". */
+export function describeAction(a: Action, names: string[], before: GameState): string {
+  const who = a.player === 0 ? 'You' : names[a.player];
+  const tile = before.pending?.tile ?? null;
+  if (a.type === 'pass') return `${who}: pass`;
+  if (a.type === 'discard') return `${who} discard${a.player === 0 ? '' : 's'} ${actionLabel(a).replace('Discard ', '')}`;
+  return `${who}: ${actionLabel(a, tile)}`;
 }

@@ -223,6 +223,19 @@ button.tile:focus-visible { outline: 3px solid var(--dots); outline-offset: 2px;
 .log-list li > div:first-child { display: flex; justify-content: space-between; gap: 8px; }
 .replay-controls { display: flex; gap: 8px; align-items: center; }
 .replay-controls input { flex: 1; min-height: 36px; }
+/* Review: the slider with a coloured marker per decision above it (aligned with the slider's thumb). */
+.scrub { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.scrub input { width: 100%; }
+.review-track { position: relative; height: 22px; }
+.review-track .mark { position: absolute; bottom: 2px; width: 12px; height: 18px; translate: -50% 0; padding: 0; border: 2px solid var(--panel); border-radius: 4px; cursor: pointer; background: var(--green); }
+.review-track .mark::after { content: ""; position: absolute; inset: -6px -4px; } /* a bigger tap target */
+.review-track .mark.v-fine { background: #8aa596; }
+.review-track .mark.v-mistake { background: #d39a2f; }
+.review-track .mark.v-big-mistake { background: var(--red); }
+.review-track .mark.on { height: 22px; outline: 2px solid var(--ink); outline-offset: 1px; z-index: 1; }
+.review-nav { display: flex; gap: 8px; justify-content: space-between; margin: 4px 0; }
+.review-hint { margin: 8px 0; font-size: 0.9rem; }
+.review .table { margin-top: 6px; }
 /* Settings: a centred sheet of groups; two fields to a row on wide screens, one on a phone. */
 .settings { max-width: 820px; margin: 0 auto; }
 .set-group { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 28px; padding: 14px 0 18px; border-top: 1px solid var(--line); }

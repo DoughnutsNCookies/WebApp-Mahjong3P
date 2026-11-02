@@ -44,7 +44,7 @@ export function App() {
         )}
         {tab === 'play' && m.game && reviewing && (
           <Review
-            seed={m.game.seed} dealer={m.game.dealer} actions={m.game.actions} unitSen={m.game.rules.unitSen}
+            seed={m.game.seed} dealer={m.game.dealer} actions={m.game.actions} unitSen={m.game.rules.unitSen} names={names}
             onClose={() => setReviewing(false)}
           />
         )}

@@ -3,8 +3,8 @@
 // Saved hands: the list, a step-by-step replay of any hand, and its review.
 
 import { useMemo, useState } from 'react';
-import { Action, applyAction, GameState, newRound, playerView } from '../engine';
-import { actionLabel, levelName, rmShort } from './format';
+import { applyAction, GameState, newRound, playerView } from '../engine';
+import { describeAction, levelName, rmShort } from './format';
 import { CopyReport } from './CopyReport';
 import { Review } from './Review';
 import { deleteLog, exportLogs, loadLogs, SavedRound } from './storage';
@@ -14,14 +14,6 @@ import { rulesFor } from './useMatch';
 import { latestHappening, riversOf, winningTile } from './feed';
 
 const namesFor = (log: SavedRound) => ['You', `Bot 1 · ${levelName(log.levels[0])}`, `Bot 2 · ${levelName(log.levels[1])}`];
-
-function describe(a: Action, names: string[], before: GameState): string {
-  const who = a.player === 0 ? 'You' : names[a.player];
-  const tile = before.pending?.tile ?? null;
-  if (a.type === 'pass') return `${who}: pass`;
-  if (a.type === 'discard') return `${who} discard${a.player === 0 ? '' : 's'} ${actionLabel(a).replace('Discard ', '')}`;
-  return `${who}: ${actionLabel(a, tile)}`;
-}
 
 export function Replay({ log, start = 0, onClose }: { log: SavedRound; start?: number; onClose: () => void }) {
   const names = namesFor(log);
@@ -35,7 +27,7 @@ export function Replay({ log, start = 0, onClose }: { log: SavedRound; start?: n
   const [revealAll, setRevealAll] = useState(false);
   const s = states[step];
   const view = playerView(s, 0);
-  const last = step > 0 ? describe(log.actions[step - 1], names, states[step - 1]) : 'The deal';
+  const last = step > 0 ? describeAction(log.actions[step - 1], names, states[step - 1]) : 'The deal';
 
   return (
     <div className="replay">
@@ -79,8 +71,7 @@ export function Hands() {
     const { log } = open;
     return (
       <Review
-        seed={log.seed} dealer={log.dealer} actions={log.actions} unitSen={log.unitSen}
-        onReplay={(i) => setOpen({ log, mode: 'replay', start: i })}
+        seed={log.seed} dealer={log.dealer} actions={log.actions} unitSen={log.unitSen} names={namesFor(log)}
         onClose={() => setOpen(null)}
       />
     );
