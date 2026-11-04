@@ -207,10 +207,10 @@ describe('multiplayer room', () => {
             // Neither sees the other's claim timer: it would give away that they can claim.
             expect(a.state.timers[1]).toBeNull();
             expect(b.state.timers[2]).toBeNull();
-            // One answers; the other's deadline keeps running (not reset).
-            const before = b.state.deadline;
+            // One answers a moment later; every move made starts the other's time again.
+            deps.advance(200);
             room.handle('A', { t: 'act', action: { type: 'pass', player: 0 } });
-            if (room.game!.phase === 'claim') expect(b.state.deadline).toBe(before);
+            if (room.game!.phase === 'claim') expect(b.state.deadline).toBe(deps.t + TIMING.humanClaim);
             claimSeen = true;
             break;
           }

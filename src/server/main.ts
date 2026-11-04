@@ -7,7 +7,7 @@
 //   ALLOWED_ORIGINS  comma-separated page origins allowed to connect (default: the live game and localhost)
 //   AI_MODEL      path to the trained AI's weights (public/ai/<file>); without it AI bots play as Normal
 //
-// Rooms live in memory and all go on a restart. A room closes as soon as its last person leaves, or five minutes
+// Rooms live in memory and all go on a restart. A room closes as soon as its last person leaves, or a minute
 // after the last connection drops (play stops meanwhile, so bots never play on alone).
 
 import { readFileSync } from 'node:fs';
@@ -167,7 +167,7 @@ wss.on('connection', (ws: WebSocket, req) => {
 
   ws.on('close', () => {
     clearInterval(ping);
-    if (playerId) room()?.disconnect(playerId);
+    if (playerId) room()?.disconnect(playerId, conn);
   });
 });
 

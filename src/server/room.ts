@@ -29,7 +29,7 @@ type Seat =
  * Bot pacing, as in single player at Normal speed, and how long a person may take before the bot decides.
  * emptyClose: how long a room with nobody connected waits for someone to come back before it closes.
  */
-export const TIMING = { botTurn: 1150, botClaim: 380, humanTurn: 40_000, humanClaim: 15_000, dropToBot: 10_000, emptyClose: 5 * 60_000 };
+export const TIMING = { botTurn: 1150, botClaim: 380, humanTurn: 40_000, humanClaim: 15_000, dropToBot: 10_000, emptyClose: 60_000 };
 const BOT_NAMES: Record<BotKind, string> = { easy: 'Easy bot', normal: 'Normal bot', ai: 'AI v2' };
 const rel = (seat: number, viewer: number) => (seat - viewer + 3) % 3;
 
@@ -96,10 +96,12 @@ export class Room {
   }
 
   /** The connection dropped: after a while a bot plays for them; between rounds the table waits for them. */
-  disconnect(playerId: string) {
+  disconnect(playerId: string, conn?: Conn) {
     const seat = this.seatOf(playerId);
     if (seat < 0) return;
     const s = this.seats[seat] as Extract<Seat, { kind: 'human' }>;
+    // An old connection closing after a refresh's new one has joined: they are still here.
+    if (conn && s.conn !== conn) return;
     s.conn = null;
     this.dropTimers.set(playerId, this.deps.setTimeout(() => {
       this.dropTimers.delete(playerId);
@@ -258,6 +260,8 @@ export class Room {
 
   private apply(a: Action) {
     this.game = applyAction(this.game!, a);
+    // Any move starts everyone's time again: a pong then a discard, or a kong then a discard, each get the full time.
+    this.deadlines.clear();
     if (this.game.phase === 'ended') this.endRound();
     this.schedule();
     this.broadcast();
@@ -280,7 +284,7 @@ export class Room {
 
   /**
    * Who moves next and when. Bots (and people a bot is standing in for) move after a pause; every person who
-   * is deciding has their own deadline, which keeps running while others answer the same claim.
+   * is deciding has their own deadline, which starts again whenever anyone makes a move.
    */
   private schedule() {
     this.deps.clearTimeout(this.timer);

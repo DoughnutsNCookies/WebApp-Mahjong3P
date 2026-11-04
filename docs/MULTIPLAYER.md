@@ -12,14 +12,14 @@ empty seats with bots (Easy, Normal or AI v2) and starts. Chat and emoji at the 
   Tested: a seat's view never changes when hidden tiles change (`tests/seat.test.ts`).
 - **Moves** arrive as the player sees the table (player 0) and are checked against the real round.
 - **Bots** run on the server; AI v2 uses the same weights as the web game.
-- **Timing:** a person has 40 s for a turn and 15 s for a claim; then the Normal bot moves for them
+- **Timing:** a person has 40 s for a turn and 15 s for a claim, starting again after every move anyone makes; then the Normal bot moves for them
   (on a claim, it lets the tile go). Bots move after 1.15 s (turn) or 0.38 s (claim).
 - **Dropping out:** after 10 s a Normal bot plays the seat; reconnecting (same browser) gives it back.
   Between rounds the table waits until everyone is back and has pressed Next round. The host can remove
   a disconnected player (their seat becomes a bot).
 - **Rooms are temporary:** in memory only, and all closed by a restart or a deploy. A room closes as soon as
   its last person leaves. If everyone is disconnected instead, play stops (the bots never play on alone) and
-  the room closes after 5 minutes unless someone comes back; anyone returning later is told it closed.
+  the room closes after 1 minute unless someone comes back; anyone returning later is told it closed.
 - **Limits:** chat 200 characters, one message per 0.7 s; emoji up to 6 a second each; 500 rooms.
 
 Code: `src/server/` (protocol, room, main), `src/ui/online/` (connection and screens).
