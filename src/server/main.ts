@@ -7,7 +7,8 @@
 //   ALLOWED_ORIGINS  comma-separated page origins allowed to connect (default: the live game and localhost)
 //   AI_MODEL      path to the trained AI's weights (public/ai/<file>); without it AI bots play as Normal
 //
-// Rooms live in memory: a room closes an hour after its last person leaves, and all rooms go on a restart.
+// Rooms live in memory and all go on a restart. A room closes as soon as its last person leaves, or five minutes
+// after the last connection drops (play stops meanwhile, so bots never play on alone).
 
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -46,6 +47,26 @@ const deps: Deps = {
 const rooms = new Map<string, Room>();
 /** Which room each person is in (one at a time). */
 const roomOf = new Map<string, string>();
+/** People whose room closed while they were away, told why when they come back. */
+const closedFor = new Map<string, string>();
+
+function forget(code: string, reason: string) {
+  rooms.get(code)?.close();
+  rooms.delete(code);
+  for (const [p, c] of roomOf) {
+    if (c !== code) continue;
+    roomOf.delete(p);
+    closedFor.set(p, reason);
+  }
+  while (closedFor.size > 5000) closedFor.delete(closedFor.keys().next().value!);
+}
+
+function addRoom(code: string, hostId: string): Room {
+  const r = new Room(code, hostId, deps);
+  r.onEmpty = () => forget(code, `Room ${code} closed: everyone had left.`);
+  rooms.set(code, r);
+  return r;
+}
 
 function newCode(): string | null {
   for (let i = 0; i < 200; i++) {
@@ -102,6 +123,8 @@ wss.on('connection', (ws: WebSocket, req) => {
       // Back after a drop or a refresh: straight back into your room.
       const r = room();
       if (r) r.join(playerId, name, conn);
+      else if (closedFor.has(playerId)) conn.send({ t: 'left', reason: closedFor.get(playerId)! });
+      closedFor.delete(playerId);
       return;
     }
     if (!playerId) return error('Say hello first.');
@@ -111,8 +134,7 @@ wss.on('connection', (ws: WebSocket, req) => {
         if (rooms.size >= MAX_ROOMS) return error('The server is full right now. Try again later.');
         const code = newCode();
         if (!code) return error('No free room codes right now. Try again.');
-        const r = new Room(code, playerId, deps);
-        rooms.set(code, r);
+        const r = addRoom(code, playerId);
         roomOf.set(playerId, code);
         r.join(playerId, name, conn);
         return;
@@ -128,8 +150,9 @@ wss.on('connection', (ws: WebSocket, req) => {
         return;
       }
       case 'leave': {
-        room()?.leave(playerId);
+        const r = room();
         roomOf.delete(playerId);
+        r?.leave(playerId);
         return;
       }
       case 'name':
@@ -148,16 +171,12 @@ wss.on('connection', (ws: WebSocket, req) => {
   });
 });
 
-// Close rooms an hour after the last person left.
+// A safety net: rooms normally close themselves (onEmpty); this catches one that somehow didn't.
 setInterval(() => {
   const now = Date.now();
   for (const [code, r] of rooms) {
     if (r.hasPeople()) { r.lastActive = now; continue; }
-    if (now - r.lastActive > IDLE_MS) {
-      r.close();
-      rooms.delete(code);
-      for (const [p, c] of roomOf) if (c === code) roomOf.delete(p);
-    }
+    if (now - r.lastActive > IDLE_MS) forget(code, `Room ${code} closed: nobody was there.`);
   }
 }, 60_000);
 

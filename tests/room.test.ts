@@ -261,4 +261,53 @@ describe('multiplayer room', () => {
       expect(v.seats[v.game!.result!.winner!].name).toBe({ A: 'Sean', B: 'Ali', C: 'Mei' }[next]);
     }
   });
+  it('the room closes as soon as the last person leaves, even mid-game', () => {
+    const deps = fakeDeps(5);
+    const room = new Room('2222', 'A', deps);
+    let closed = 0;
+    room.onEmpty = () => closed++;
+    const a = person();
+    const b = person();
+    room.join('A', 'Sean', a);
+    room.join('B', 'Ali', b);
+    room.handle('A', { t: 'addBot', seat: 2, level: 'normal' });
+    room.handle('A', { t: 'start' });
+    room.leave('B');
+    expect(closed).toBe(0); // Sean is still there
+    room.leave('A');
+    expect(closed).toBe(1);
+    expect(room.closed).toBe(true);
+    const moves = room.game!.actions.length;
+    deps.advance(10 * 60_000);
+    expect(room.game!.actions.length).toBe(moves); // nothing plays on
+  });
+
+  it('with everyone disconnected, play stops, and the room closes unless someone is back in time', () => {
+    const deps = fakeDeps(6);
+    const room = new Room('3333', 'A', deps);
+    let closed = 0;
+    room.onEmpty = () => closed++;
+    const a = person();
+    const b = person();
+    room.join('A', 'Sean', a);
+    room.join('B', 'Ali', b);
+    room.handle('A', { t: 'addBot', seat: 2, level: 'normal' });
+    room.handle('A', { t: 'start' });
+    room.disconnect('A');
+    room.disconnect('B');
+    const moves = room.game!.actions.length;
+    deps.advance(TIMING.emptyClose - 1000);
+    expect(room.game!.actions.length).toBe(moves); // the bots did not play on alone
+    expect(closed).toBe(0);
+    // Ali comes back in time: play resumes and the room stays.
+    const b2 = person();
+    expect(room.join('B', 'Ali', b2)).toBeNull();
+    deps.advance(TIMING.emptyClose + 1000);
+    expect(closed).toBe(0);
+    expect(room.game!.actions.length).toBeGreaterThan(moves);
+    // Everyone gone again, for good this time.
+    room.disconnect('B');
+    deps.advance(TIMING.emptyClose + 1);
+    expect(closed).toBe(1);
+  });
 });

@@ -25,8 +25,11 @@ type Seat =
   | { kind: 'bot'; level: BotKind; name: string }
   | { kind: 'human'; playerId: string; name: string; conn: Conn | null; autoplay: boolean; ready: boolean; lastChat: number; emojiAt: number[] };
 
-/** Bot pacing, as in single player at Normal speed, and how long a person may take before the bot decides. */
-export const TIMING = { botTurn: 1150, botClaim: 380, humanTurn: 40_000, humanClaim: 15_000, dropToBot: 10_000 };
+/**
+ * Bot pacing, as in single player at Normal speed, and how long a person may take before the bot decides.
+ * emptyClose: how long a room with nobody connected waits for someone to come back before it closes.
+ */
+export const TIMING = { botTurn: 1150, botClaim: 380, humanTurn: 40_000, humanClaim: 15_000, dropToBot: 10_000, emptyClose: 5 * 60_000 };
 const BOT_NAMES: Record<BotKind, string> = { easy: 'Easy bot', normal: 'Normal bot', ai: 'AI v2' };
 const rel = (seat: number, viewer: number) => (seat - viewer + 3) % 3;
 
@@ -48,7 +51,11 @@ export class Room {
   /** Each person deciding right now: when they run out of time, and how long they had. */
   private deadlines = new Map<number, { at: number; total: number }>();
   private dropTimers = new Map<string, unknown>();
+  private emptyTimer: unknown = null;
   private chatId = 0;
+  /** Called once when the room closes because everyone has gone; the server then forgets it. */
+  onEmpty: (() => void) | null = null;
+  closed = false;
 
   constructor(code: string, hostId: string, private deps: Deps) {
     this.code = code;
@@ -79,6 +86,8 @@ export class Room {
       this.deps.clearTimeout(this.dropTimers.get(playerId));
       this.dropTimers.delete(playerId);
     }
+    this.deps.clearTimeout(this.emptyTimer);
+    this.emptyTimer = null;
     this.lastActive = this.deps.now();
     conn.send({ t: 'chat', messages: this.chat });
     this.schedule();
@@ -99,6 +108,11 @@ export class Room {
       this.schedule();
       this.broadcast();
     }, TIMING.dropToBot));
+    if (!this.hasPeople()) {
+      // Nobody left at the table: stop play (bots don't carry on alone) and close unless someone is back soon.
+      this.schedule();
+      this.disconnectedOnly();
+    }
     this.broadcast();
   }
 
@@ -114,9 +128,23 @@ export class Room {
       const next = this.seats.find((x) => x.kind === 'human') as Extract<Seat, { kind: 'human' }> | undefined;
       if (next) this.hostId = next.playerId;
     }
+    if (!this.seats.some((x) => x.kind === 'human')) return this.closeEmpty();
+    if (!this.hasPeople()) this.disconnectedOnly();
     this.schedule();
     this.broadcast();
     this.maybeStartNext();
+  }
+
+  /** Everyone still seated is disconnected: close the room if nobody is back within TIMING.emptyClose. */
+  private disconnectedOnly() {
+    this.deps.clearTimeout(this.emptyTimer);
+    this.emptyTimer = this.deps.setTimeout(() => { if (!this.hasPeople()) this.closeEmpty(); }, TIMING.emptyClose);
+  }
+
+  private closeEmpty() {
+    if (this.closed) return;
+    this.close();
+    this.onEmpty?.();
   }
 
   hasPeople(): boolean {
@@ -258,7 +286,7 @@ export class Room {
     this.deps.clearTimeout(this.timer);
     this.timer = null;
     const g = this.game;
-    if (!g || g.phase === 'ended' || this.phase !== 'playing') {
+    if (!g || g.phase === 'ended' || this.phase !== 'playing' || !this.hasPeople()) {
       this.deadlines.clear();
       return;
     }
@@ -335,7 +363,9 @@ export class Room {
   }
 
   close() {
+    this.closed = true;
     this.deps.clearTimeout(this.timer);
+    this.deps.clearTimeout(this.emptyTimer);
     for (const t of this.dropTimers.values()) this.deps.clearTimeout(t);
   }
 }
