@@ -3,7 +3,7 @@
 // Saved hands: the list, a step-by-step replay of any hand, and its review.
 
 import { useMemo, useState } from 'react';
-import { applyLogged, GameState, newRound, playerView } from '../engine';
+import { applyLogged, GameState, newRound, playerView, rulesForLog } from '../engine';
 import { describeAction, levelName, rmShort } from './format';
 import { CopyReport } from './CopyReport';
 import { Review } from './Review';
@@ -19,7 +19,7 @@ export function Replay({ log, start = 0, onClose }: { log: SavedRound; start?: n
   const names = namesFor(log);
   // Every state from the deal to the end, so the slider can move both ways instantly.
   const states = useMemo(() => {
-    const out: GameState[] = [newRound(log.seed, log.dealer, rulesFor(log.unitSen))];
+    const out: GameState[] = [newRound(log.seed, log.dealer, rulesForLog(rulesFor(log.unitSen), log.actions))];
     for (const a of log.actions) out.push(applyLogged(out[out.length - 1], a));
     return out;
   }, [log]);

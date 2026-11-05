@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AnalyzerInput, claimAdvice, inputFromState } from '../src/analyzer';
 import { botAction, BotLevel, decideWin } from '../src/bots';
-import { Action, applyAction, decodeRound, GameState, legalActions, Meld, newRound, parse, replay, Seat, waitingFor } from '../src/engine';
+import { Action, applyAction, decodeRound, DEFAULT_RULES, GameState, legalActions, Meld, newRound, parse, replay, Seat, waitingFor } from '../src/engine';
 import { meld } from './helpers';
 
 function playRound(seed: number, levels: BotLevel[], dealer = 0): { s: GameState; actions: Action[] } {
@@ -70,8 +70,10 @@ describe('bots', () => {
 
   it("doesn't spend a fei on a kong when a pong does the same (Sean's hand, 2026-10-30)", () => {
     // Bot 1 (South) holds E E + a fei when East is discarded. It used to kong with the fei.
+    // Fei kongs are no longer allowed at all (2026-11-05); the bots must still pass on one under the old rules.
     const r = decodeRound('MJ3P1|seed=1838498445|dealer=1|unit=20|1dW 2- 0p1 0dE');
-    const s = replay(r.seed, r.dealer, r.actions);
+    expect(legalActions(replay(r.seed, r.dealer, r.actions), 1).some((a) => a.type === 'claimKong')).toBe(false);
+    const s = replay(r.seed, r.dealer, r.actions, { ...DEFAULT_RULES, feiKongs: true });
     expect(legalActions(s, 1)).toContainEqual({ type: 'claimKong', player: 1, jokers: 1 });
     for (const level of ['normal', 'advanced'] as BotLevel[]) {
       const a = botAction(s, 1, level);
@@ -81,6 +83,22 @@ describe('bots', () => {
     const kong = advice.find((x) => x.action.type === 'claimKong')!;
     expect(kong.recommended).toBe(false);
     expect(kong.note).toMatch(/uses up your fei/);
+  });
+
+  it('no kong can use a fei (2026-11-05), and hands saved with one still replay', () => {
+    // Bot 1 holds E E + a fei when East is discarded: a pong (with or without the fei), never a fei kong.
+    const r = decodeRound('MJ3P1|seed=1838498445|dealer=1|unit=20|1dW 2- 0p1 0dE');
+    const s = replay(r.seed, r.dealer, r.actions);
+    expect(legalActions(s, 1).filter((a) => a.type === 'claimKong')).toEqual([]);
+    // Sean's hand of 2026-11-02, where Bot 1 made a concealed kong with a fei: it still plays back to the end.
+    const old = decodeRound('MJ3P1|seed=4243844480|dealer=1|unit=20|1dS 2dE 1p1 0p0 0dS 1d5d 2- 0p0 0dW 2- 1dS 2dW 0d1d 1- 2- 1Kc8d1 1d9d 2- 2j 2d9d 0d4d 2- 1dE 2d1d 0dW 1dWd 2- 2d1d 0d2d 1d1d 2- 2d2d 0d9d 1d8d 2- 2d3d 0dWd 2- 1d2d 2- 2dWd 0dS 1d9d 2dWd 0dW');
+    const end = replay(old.seed, old.dealer, old.actions);
+    expect(end.phase).toBe('ended');
+    expect(end.result!.type).toBe('draw');
+    // Under today's rules that kong is not on offer.
+    const before = replay(old.seed, old.dealer, old.actions.slice(0, 15));
+    expect(before.turn).toBe(1);
+    expect(legalActions(before, 1).some((a) => a.type === 'kong' && a.jokers > 0)).toBe(false);
   });
 
   it('with a hand of nothing but fei, every level sets one aside (they used to crash)', () => {

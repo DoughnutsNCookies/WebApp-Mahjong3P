@@ -2,7 +2,7 @@
 // played with what the analyzer would have played, and why. Also reviews every discard offered to the
 // player (take it for a pong/chow/kong, or let it go and draw), and flags wins that were passed up.
 
-import { Action, availableWin, DEFAULT_RULES, GameState, Kind, legalActions, name, newRound, applyLogged, Rules, sameAction } from '../engine';
+import { Action, availableWin, DEFAULT_RULES, GameState, Kind, legalActions, name, newRound, applyLogged, Rules, rulesForLog, sameAction } from '../engine';
 import { analyze, DiscardOption } from './analyze';
 import { ClaimAdvice, claimAdvice } from './claims';
 import { inputFromState } from './inputs';
@@ -101,7 +101,7 @@ export function reviewRound(
   seed: number, dealer: number, actions: Action[], player: number, rules: Rules = DEFAULT_RULES,
 ): ReviewItem[] {
   const items: ReviewItem[] = [];
-  let s: GameState = newRound(seed, dealer, rules);
+  let s: GameState = newRound(seed, dealer, rulesForLog(rules, actions));
   actions.forEach((a, i) => {
     const after = applyLogged(s, a);
     if (after === s) return; // an answer from an older saved hand that is no longer asked for

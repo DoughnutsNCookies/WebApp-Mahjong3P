@@ -237,8 +237,8 @@ function turnActions(s: GameState, p: number): Action[] {
     for (let k = 0; k < PLAYABLE; k++) {
       const real = count(pl.hand, k);
       const need = 4 - real;
-      // Q1: jokers can fill a kong. Never more than 4 of a kind in total.
-      if (real >= 1 && need <= jokers && use[k] === real) {
+      // Q1 (changed 2026-11-05): jokers fill a kong only under rules.feiKongs. Never more than 4 of a kind.
+      if (real >= 1 && need <= (s.rules.feiKongs ? jokers : 0) && use[k] === real) {
         out.push({ type: 'kong', player: p, kind: k, kongType: 'concealed', jokers: need });
       }
     }
@@ -246,7 +246,7 @@ function turnActions(s: GameState, p: number): Action[] {
       if (m.type !== 'pong' || m.concealed) continue;
       const k = m.slots[0].kind;
       if (count(pl.hand, k) > 0) out.push({ type: 'kong', player: p, kind: k, kongType: 'added', jokers: 0 });
-      else if (jokers > 0 && use[k] < 4) out.push({ type: 'kong', player: p, kind: k, kongType: 'added', jokers: 1 });
+      else if (s.rules.feiKongs && jokers > 0 && use[k] < 4) out.push({ type: 'kong', player: p, kind: k, kongType: 'added', jokers: 1 });
     }
   }
   // ASSUMPTION: with the wall empty there is no replacement tile, so a joker can't be set aside - unless the
@@ -273,6 +273,7 @@ function claimOptions(s: GameState, p: number, tile: Kind, from: number): Action
   // and never make a 5th copy of the tile.
   for (const [type, size] of [['pong', 3], ['claimKong', 4]] as const) {
     const j = Math.max(0, size - 1 - real);
+    if (type === 'claimKong' && j > 0 && !s.rules.feiKongs) continue; // a kong is four real tiles
     if (j <= jokers && use[tile] + 1 + j <= 4) out.push({ type, player: p, jokers: j });
   }
   if (p === next(from) && isDot(tile)) {
@@ -644,7 +645,13 @@ function finish(s: GameState, result: RoundResult) {
   s.events.push({ e: 'end', result });
 }
 
+/** The rules a saved round was played under: one with a fei kong in it predates their removal (2026-11-05). */
+export function rulesForLog(rules: Rules, actions: Action[]): Rules {
+  const fei = actions.some((a) => (a.type === 'kong' || a.type === 'claimKong') && a.jokers > 0);
+  return fei && !rules.feiKongs ? { ...rules, feiKongs: true } : rules;
+}
+
 /** Rebuilds a round from its log. */
 export function replay(seed: number, dealer: number, actions: Action[], rules: Rules = DEFAULT_RULES): GameState {
-  return actions.reduce(applyLogged, newRound(seed, dealer, rules));
+  return actions.reduce(applyLogged, newRound(seed, dealer, rulesForLog(rules, actions)));
 }

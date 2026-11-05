@@ -2,7 +2,7 @@
 // payment, each of your decisions next to the analyzer's, and a replay code that rebuilds the round.
 
 import {
-  Action, applyAction, CAP, code, DEFAULT_RULES, encodeRound, format, GameState, newRound, rm, Rules, SEAT_NAMES,
+  Action, applyLogged, CAP, rulesForLog, code, DEFAULT_RULES, encodeRound, format, GameState, newRound, rm, Rules, SEAT_NAMES,
   seatOf,
 } from '../engine';
 import { reviewRound } from './review';
@@ -22,8 +22,8 @@ const VERDICT = { best: 'ok', fine: 'fine', mistake: 'MISTAKE', 'big mistake': '
 export function roundReport(r: ReportInput): string {
   const rules = r.rules ?? DEFAULT_RULES;
   const names = ['You', `Bot 1${r.levels ? ` (${r.levels[0]})` : ''}`, `Bot 2${r.levels ? ` (${r.levels[1]})` : ''}`];
-  const states: GameState[] = [newRound(r.seed, r.dealer, rules)];
-  for (const a of r.actions) states.push(applyAction(states[states.length - 1], a));
+  const states: GameState[] = [newRound(r.seed, r.dealer, rulesForLog(rules, r.actions))];
+  for (const a of r.actions) states.push(applyLogged(states[states.length - 1], a));
   const end = states[states.length - 1];
   const res = end.result;
   const lines: string[] = [];

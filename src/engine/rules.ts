@@ -23,6 +23,12 @@ export interface Rules {
    */
   kongDiscardUnits: number;
   kongSelfUnits: number;
+  /**
+   * Whether a fei can stand in for a tile in a kong (concealed, added, or from a discard). Sean's table,
+   * 2026-11-05: no - a kong is four real tiles. Hands saved before then may hold fei kongs; replaying them
+   * turns this on for that round only (rulesForLog).
+   */
+  feiKongs: boolean;
 }
 
 export const DEFAULT_RULES: Rules = {
@@ -32,6 +38,7 @@ export const DEFAULT_RULES: Rules = {
   openingSlamInstantWin: true,
   kongDiscardUnits: 2,
   kongSelfUnits: 1,
+  feiKongs: false,
 };
 
 /** Seats: 0 = East (dealer), 1 = South, 2 = West. There is no North seat. */
